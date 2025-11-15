@@ -17,13 +17,20 @@ using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
 using Honua.Server.Core.Security;
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Enterprise.Data.BigQuery;
 
 public sealed class BigQueryDataStoreProvider : IDataStoreProvider, IDisposable
 {
     private readonly ConcurrentDictionary<string, BigQueryClient> _clients = new(StringComparer.Ordinal);
+    private readonly ILogger<BigQueryDataStoreProvider> _logger;
     private bool _disposed;
+
+    public BigQueryDataStoreProvider(ILogger<BigQueryDataStoreProvider> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
     public const string ProviderKey = "bigquery";
 
@@ -275,10 +282,12 @@ public sealed class BigQueryDataStoreProvider : IDataStoreProvider, IDisposable
         // Log the hard delete operation for audit compliance (GDPR, SOC2, etc.)
         if (deleted)
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"HARD DELETE: Feature permanently deleted from BigQuery - " +
-                $"Layer: {layer.Id}, FeatureId: {featureId}, DeletedBy: {deletedBy ?? "<system>"}, " +
-                $"RowsAffected: {rowsAffected}");
+            _logger.LogWarning(
+                "HARD DELETE: Feature permanently deleted from BigQuery - Layer: {LayerId}, FeatureId: {FeatureId}, DeletedBy: {DeletedBy}, RowsAffected: {RowsAffected}",
+                layer.Id,
+                featureId,
+                deletedBy ?? "<system>",
+                rowsAffected);
         }
 
         return deleted;

@@ -437,23 +437,48 @@ internal static class OgcTilesHandlers
         }
 
         // Forward to the legacy handler with the resolved tilesetId
+        var coordinates = new TileCoordinates
+        {
+            CollectionId = collectionId,
+            TilesetId = dataset.Id,
+            TileMatrixSetId = tileMatrixSetId,
+            TileMatrix = tileMatrix,
+            TileRow = tileRow,
+            TileCol = tileCol
+        };
+
+        var operationContext = new TileOperationContext
+        {
+            Request = request
+        };
+
+        var resolutionServices = new TileResolutionServices
+        {
+            ContextResolver = resolver,
+            RasterRegistry = rasterRegistry,
+            MetadataRegistry = metadataRegistry,
+            Repository = repository
+        };
+
+        var renderingServices = new TileRenderingServices
+        {
+            Renderer = rasterRenderer,
+            PMTilesExporter = pmTilesExporter
+        };
+
+        var cachingServices = new TileCachingServices
+        {
+            CacheProvider = tileCacheProvider,
+            CacheMetrics = tileCacheMetrics,
+            CacheHeaders = cacheHeaderService
+        };
+
         return await GetCollectionTile(
-            collectionId,
-            dataset.Id,
-            tileMatrixSetId,
-            tileMatrix,
-            tileRow,
-            tileCol,
-            request,
-            resolver,
-            rasterRegistry,
-            rasterRenderer,
-            metadataRegistry,
-            repository,
-            pmTilesExporter,
-            tileCacheProvider,
-            tileCacheMetrics,
-            cacheHeaderService,
+            coordinates,
+            operationContext,
+            resolutionServices,
+            renderingServices,
+            cachingServices,
             tilesHandler,
             cancellationToken).ConfigureAwait(false);
     }
@@ -461,22 +486,11 @@ internal static class OgcTilesHandlers
     /// <summary>
     /// Retrieves a single tile for a collection at the specified coordinates.
     /// </summary>
-    /// <param name="collectionId">The collection identifier (format: "serviceId::layerId").</param>
-    /// <param name="tilesetId">The tileset (raster dataset) identifier.</param>
-    /// <param name="tileMatrixSetId">The tile matrix set identifier (e.g., "WorldWebMercatorQuad").</param>
-    /// <param name="tileMatrix">The zoom level (tile matrix).</param>
-    /// <param name="tileRow">The tile row coordinate.</param>
-    /// <param name="tileCol">The tile column coordinate.</param>
-    /// <param name="request">The HTTP request.</param>
-    /// <param name="resolver">Service for resolving collection context.</param>
-    /// <param name="rasterRegistry">Registry for raster dataset definitions.</param>
-    /// <param name="rasterRenderer">Service for rendering raster tiles.</param>
-    /// <param name="metadataRegistry">Registry for metadata and style definitions.</param>
-    /// <param name="repository">Repository for feature data (used for vector tiles and overlays).</param>
-    /// <param name="pmTilesExporter">Exporter for PMTiles format.</param>
-    /// <param name="tileCacheProvider">Provider for tile caching.</param>
-    /// <param name="tileCacheMetrics">Metrics collector for tile cache operations.</param>
-    /// <param name="cacheHeaderService">Service for generating cache headers and ETags.</param>
+    /// <param name="coordinates">Tile coordinates including collection ID, tileset ID, matrix set, and row/column.</param>
+    /// <param name="operationContext">HTTP context for the tile operation.</param>
+    /// <param name="resolutionServices">Services for resolving tile metadata and data sources.</param>
+    /// <param name="renderingServices">Services for rendering raster tiles.</param>
+    /// <param name="cachingServices">Services for tile caching and performance optimization.</param>
     /// <param name="tilesHandler">Handler for OGC tiles operations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
@@ -511,34 +525,38 @@ internal static class OgcTilesHandlers
     /// </para>
     /// </remarks>
     public static async Task<IResult> GetCollectionTile(
-        string collectionId,
-        string tilesetId,
-        string tileMatrixSetId,
-        string tileMatrix,
-        int tileRow,
-        int tileCol,
-        HttpRequest request,
-        [FromServices] IFeatureContextResolver resolver,
-        [FromServices] IRasterDatasetRegistry rasterRegistry,
-        [FromServices] IRasterRenderer rasterRenderer,
-        [FromServices] IMetadataRegistry metadataRegistry,
-        [FromServices] IFeatureRepository repository,
-        [FromServices] IPmTilesExporter pmTilesExporter,
-        [FromServices] IRasterTileCacheProvider tileCacheProvider,
-        [FromServices] IRasterTileCacheMetrics tileCacheMetrics,
-        [FromServices] OgcCacheHeaderService cacheHeaderService,
+        TileCoordinates coordinates,
+        TileOperationContext operationContext,
+        [FromServices] TileResolutionServices resolutionServices,
+        [FromServices] TileRenderingServices renderingServices,
+        [FromServices] TileCachingServices cachingServices,
         [FromServices] Services.IOgcTilesHandler tilesHandler,
         CancellationToken cancellationToken)
     {
-        Guard.NotNull(request);
-        Guard.NotNull(resolver);
-        Guard.NotNull(rasterRegistry);
-        Guard.NotNull(rasterRenderer);
-        Guard.NotNull(metadataRegistry);
-        Guard.NotNull(repository);
-        Guard.NotNull(pmTilesExporter);
-        Guard.NotNull(tileCacheProvider);
-        Guard.NotNull(tileCacheMetrics);
+        Guard.NotNull(coordinates);
+        Guard.NotNull(operationContext);
+        Guard.NotNull(resolutionServices);
+        Guard.NotNull(renderingServices);
+        Guard.NotNull(cachingServices);
+        Guard.NotNull(tilesHandler);
+
+        var request = operationContext.Request;
+        var resolver = resolutionServices.ContextResolver;
+        var rasterRegistry = resolutionServices.RasterRegistry;
+        var metadataRegistry = resolutionServices.MetadataRegistry;
+        var repository = resolutionServices.Repository;
+        var rasterRenderer = renderingServices.Renderer;
+        var pmTilesExporter = renderingServices.PMTilesExporter;
+        var tileCacheProvider = cachingServices.CacheProvider;
+        var tileCacheMetrics = cachingServices.CacheMetrics;
+        var cacheHeaderService = cachingServices.CacheHeaders;
+
+        var collectionId = coordinates.CollectionId;
+        var tilesetId = coordinates.TilesetId;
+        var tileMatrixSetId = coordinates.TileMatrixSetId;
+        var tileMatrix = coordinates.TileMatrix;
+        var tileRow = coordinates.TileRow;
+        var tileCol = coordinates.TileCol;
 
         var resolution = await OgcSharedHandlers.ResolveCollectionAsync(collectionId, resolver, cancellationToken).ConfigureAwait(false);
         if (resolution.IsFailure)

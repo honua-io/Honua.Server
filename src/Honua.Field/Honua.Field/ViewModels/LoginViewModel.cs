@@ -4,6 +4,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using HonuaField.Services;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -211,12 +212,12 @@ public partial class LoginViewModel : BaseViewModel
 			if (IsBiometricsAvailable)
 			{
 				var biometricType = await _biometricService.GetBiometricTypeAsync();
-				System.Diagnostics.Debug.WriteLine($"Biometric type available: {biometricType}");
+				_logger.LogInformation("Biometric type available: {BiometricType}", biometricType);
 			}
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error checking biometrics: {ex.Message}");
+			_logger.LogError(ex, "Error checking biometrics");
 			IsBiometricsAvailable = false;
 		}
 	}
@@ -233,7 +234,7 @@ public partial class LoginViewModel : BaseViewModel
 				// Handle different error types
 				if (result.ErrorType == BiometricErrorType.UserCanceled)
 				{
-					System.Diagnostics.Debug.WriteLine("User canceled biometric authentication");
+					_logger.LogInformation("User canceled biometric authentication");
 				}
 				else if (result.ErrorType == BiometricErrorType.Locked)
 				{
@@ -249,7 +250,7 @@ public partial class LoginViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error during biometric authentication: {ex.Message}");
+			_logger.LogError(ex, "Error during biometric authentication");
 			return false;
 		}
 	}
@@ -265,7 +266,7 @@ public partial class LoginViewModel : BaseViewModel
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error setting up biometrics: {ex.Message}");
+			_logger.LogError(ex, "Error setting up biometrics");
 		}
 	}
 }

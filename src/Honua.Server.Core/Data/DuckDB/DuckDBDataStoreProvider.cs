@@ -5,7 +5,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -1140,7 +1139,7 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
         catch (Exception ex)
         {
             // Log geometry conversion failures in debug builds
-            Debug.WriteLine($"Failed to convert geometry value: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to convert geometry value");
             return value.ToString();
         }
     }
@@ -1169,7 +1168,7 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
         catch (Exception ex)
         {
             // Log WKT parsing failures in debug builds
-            Debug.WriteLine($"Failed to parse geometry text as WKT: {ex.Message}");
+            _logger.LogWarning(ex, "Failed to parse geometry text as WKT");
             return text;
         }
     }

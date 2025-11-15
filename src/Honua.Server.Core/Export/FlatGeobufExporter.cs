@@ -4,7 +4,6 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -33,6 +32,7 @@ using FgbHeaderT = FlatGeobuf.HeaderT;
 using NtsFeature = NetTopologySuite.Features.Feature;
 using NtsGeometry = NetTopologySuite.Geometries.Geometry;
 using Honua.Server.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Export;
 
@@ -50,8 +50,11 @@ public sealed record FlatGeobufExportResult(Stream Content, string FileName, lon
 
 public sealed class FlatGeobufExporter : IFlatGeobufExporter
 {
-    public FlatGeobufExporter()
+    private readonly ILogger<FlatGeobufExporter> _logger;
+
+    public FlatGeobufExporter(ILogger<FlatGeobufExporter> logger)
     {
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<FlatGeobufExporter>.Instance;
     }
 
     public async Task<FlatGeobufExportResult> ExportAsync(
@@ -154,7 +157,7 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
                     catch (Exception ex)
                     {
                         // Best effort cleanup - log in debug builds only
-                        Debug.WriteLine($"Failed to delete temporary FlatGeobuf file {tempPath}: {ex.Message}");
+                        _logger.LogWarning(ex, "Failed to delete temporary FlatGeobuf file {TempPath}", tempPath);
                     }
                 }
             }
@@ -254,7 +257,7 @@ public sealed class FlatGeobufExporter : IFlatGeobufExporter
         catch (JsonException ex)
         {
             // Log GeoJSON parsing failures in debug builds
-            Debug.WriteLine($"Failed to parse geometry as GeoJSON: {ex.Message}");
+            _logger.LogDebug(ex, "Failed to parse geometry as GeoJSON");
             return null;
         }
     }

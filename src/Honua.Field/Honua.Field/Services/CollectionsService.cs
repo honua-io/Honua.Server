@@ -4,6 +4,7 @@
 using HonuaField.Data.Repositories;
 using HonuaField.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -35,7 +36,7 @@ public class CollectionsService : ICollectionsService
 	{
 		if (string.IsNullOrWhiteSpace(id))
 		{
-			System.Diagnostics.Debug.WriteLine("GetByIdAsync: ID is null or empty");
+			_logger.LogWarning("GetByIdAsync: ID is null or empty");
 			return null;
 		}
 
@@ -45,7 +46,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting collection by ID {id}: {ex.Message}");
+			_logger.LogError(ex, "Error getting collection by ID {Id}", id);
 			throw;
 		}
 	}
@@ -62,7 +63,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting all collections: {ex.Message}");
+			_logger.LogError(ex, "Error getting all collections");
 			throw;
 		}
 	}
@@ -112,12 +113,12 @@ public class CollectionsService : ICollectionsService
 			}
 
 			var id = await _collectionRepository.InsertAsync(collection);
-			System.Diagnostics.Debug.WriteLine($"Collection created: {id}");
+			_logger.LogInformation("Collection created: {CollectionId}", id);
 			return id;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error creating collection: {ex.Message}");
+			_logger.LogError(ex, "Error creating collection");
 			throw;
 		}
 	}
@@ -161,12 +162,12 @@ public class CollectionsService : ICollectionsService
 		try
 		{
 			var result = await _collectionRepository.UpdateAsync(collection);
-			System.Diagnostics.Debug.WriteLine($"Collection updated: {collection.Id}, rows affected: {result}");
+			_logger.LogInformation("Collection updated: {CollectionId}, rows affected: {Rows}", collection.Id, result);
 			return result;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error updating collection {collection.Id}: {ex.Message}");
+			_logger.LogError(ex, "Error updating collection {CollectionId}", collection.Id);
 			throw;
 		}
 	}
@@ -187,12 +188,12 @@ public class CollectionsService : ICollectionsService
 		try
 		{
 			var result = await _collectionRepository.DeleteAsync(id);
-			System.Diagnostics.Debug.WriteLine($"Collection deleted: {id}, rows affected: {result}");
+			_logger.LogInformation("Collection deleted: {CollectionId}, rows affected: {Rows}", id, result);
 			return result;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error deleting collection {id}: {ex.Message}");
+			_logger.LogError(ex, "Error deleting collection {CollectionId}", id);
 			throw;
 		}
 	}
@@ -210,7 +211,7 @@ public class CollectionsService : ICollectionsService
 	{
 		if (string.IsNullOrWhiteSpace(collectionId))
 		{
-			System.Diagnostics.Debug.WriteLine("GetFeatureCountAsync: Collection ID is null or empty");
+			_logger.LogWarning("GetFeatureCountAsync: Collection ID is null or empty");
 			return 0;
 		}
 
@@ -220,7 +221,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting feature count for collection {collectionId}: {ex.Message}");
+			_logger.LogError(ex, "Error getting feature count for collection {CollectionId}", collectionId);
 			throw;
 		}
 	}
@@ -234,7 +235,7 @@ public class CollectionsService : ICollectionsService
 	{
 		if (string.IsNullOrWhiteSpace(collectionId))
 		{
-			System.Diagnostics.Debug.WriteLine("RefreshFeatureCountAsync: Collection ID is null or empty");
+			_logger.LogWarning("RefreshFeatureCountAsync: Collection ID is null or empty");
 			return 0;
 		}
 
@@ -242,12 +243,12 @@ public class CollectionsService : ICollectionsService
 		{
 			var count = await _featureRepository.GetCountByCollectionAsync(collectionId);
 			var result = await _collectionRepository.UpdateItemsCountAsync(collectionId, count);
-			System.Diagnostics.Debug.WriteLine($"Collection {collectionId} feature count refreshed: {count}");
+			_logger.LogInformation("Collection {CollectionId} feature count refreshed: {Count}", collectionId, count);
 			return result;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error refreshing feature count for collection {collectionId}: {ex.Message}");
+			_logger.LogError(ex, "Error refreshing feature count for collection {CollectionId}", collectionId);
 			throw;
 		}
 	}
@@ -261,7 +262,7 @@ public class CollectionsService : ICollectionsService
 	{
 		if (string.IsNullOrWhiteSpace(collectionId))
 		{
-			System.Diagnostics.Debug.WriteLine("GetStatsAsync: Collection ID is null or empty");
+			_logger.LogWarning("GetStatsAsync: Collection ID is null or empty");
 			return null;
 		}
 
@@ -270,7 +271,7 @@ public class CollectionsService : ICollectionsService
 			var collection = await _collectionRepository.GetByIdAsync(collectionId);
 			if (collection == null)
 			{
-				System.Diagnostics.Debug.WriteLine($"Collection not found: {collectionId}");
+				_logger.LogWarning("Collection not found: {CollectionId}", collectionId);
 				return null;
 			}
 
@@ -299,7 +300,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting stats for collection {collectionId}: {ex.Message}");
+			_logger.LogError(ex, "Error getting stats for collection {CollectionId}", collectionId);
 			throw;
 		}
 	}
@@ -313,7 +314,7 @@ public class CollectionsService : ICollectionsService
 	{
 		if (string.IsNullOrWhiteSpace(collectionId))
 		{
-			System.Diagnostics.Debug.WriteLine("RefreshExtentAsync: Collection ID is null or empty");
+			_logger.LogWarning("RefreshExtentAsync: Collection ID is null or empty");
 			return 0;
 		}
 
@@ -322,7 +323,7 @@ public class CollectionsService : ICollectionsService
 			var extent = await _featureRepository.GetExtentAsync(collectionId);
 			if (!extent.HasValue)
 			{
-				System.Diagnostics.Debug.WriteLine($"No features found for collection {collectionId}, extent not updated");
+				_logger.LogInformation("No features found for collection {CollectionId}, extent not updated", collectionId);
 				return 0;
 			}
 
@@ -335,12 +336,12 @@ public class CollectionsService : ICollectionsService
 			});
 
 			var result = await _collectionRepository.UpdateExtentAsync(collectionId, extentJson);
-			System.Diagnostics.Debug.WriteLine($"Collection {collectionId} extent refreshed");
+			_logger.LogInformation("Collection {CollectionId} extent refreshed", collectionId);
 			return result;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error refreshing extent for collection {collectionId}: {ex.Message}");
+			_logger.LogError(ex, "Error refreshing extent for collection {CollectionId}", collectionId);
 			throw;
 		}
 	}
@@ -370,7 +371,7 @@ public class CollectionsService : ICollectionsService
 			// Basic validation: schema should be a JSON object
 			if (document.RootElement.ValueKind != JsonValueKind.Object)
 			{
-				System.Diagnostics.Debug.WriteLine("Schema validation failed: root must be an object");
+				_logger.LogWarning("Schema validation failed: root must be an object");
 				return false;
 			}
 
@@ -379,7 +380,7 @@ public class CollectionsService : ICollectionsService
 			{
 				if (properties.ValueKind != JsonValueKind.Object)
 				{
-					System.Diagnostics.Debug.WriteLine("Schema validation failed: properties must be an object");
+					_logger.LogWarning("Schema validation failed: properties must be an object");
 					return false;
 				}
 			}
@@ -389,7 +390,7 @@ public class CollectionsService : ICollectionsService
 			{
 				if (type.ValueKind != JsonValueKind.String)
 				{
-					System.Diagnostics.Debug.WriteLine("Schema validation failed: type must be a string");
+					_logger.LogWarning("Schema validation failed: type must be a string");
 					return false;
 				}
 			}
@@ -398,7 +399,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (JsonException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Schema validation failed: {ex.Message}");
+			_logger.LogWarning(ex, "Schema validation failed");
 			return false;
 		}
 	}
@@ -424,7 +425,7 @@ public class CollectionsService : ICollectionsService
 			// Basic validation: symbology should be a JSON object
 			if (document.RootElement.ValueKind != JsonValueKind.Object)
 			{
-				System.Diagnostics.Debug.WriteLine("Symbology validation failed: root must be an object");
+				_logger.LogWarning("Symbology validation failed: root must be an object");
 				return false;
 			}
 
@@ -433,7 +434,7 @@ public class CollectionsService : ICollectionsService
 			{
 				if (color.ValueKind != JsonValueKind.String && color.ValueKind != JsonValueKind.Object)
 				{
-					System.Diagnostics.Debug.WriteLine("Symbology validation failed: color must be a string or object");
+					_logger.LogWarning("Symbology validation failed: color must be a string or object");
 					return false;
 				}
 			}
@@ -443,7 +444,7 @@ public class CollectionsService : ICollectionsService
 			{
 				if (icon.ValueKind != JsonValueKind.String)
 				{
-					System.Diagnostics.Debug.WriteLine("Symbology validation failed: icon must be a string");
+					_logger.LogWarning("Symbology validation failed: icon must be a string");
 					return false;
 				}
 			}
@@ -453,7 +454,7 @@ public class CollectionsService : ICollectionsService
 			{
 				if (style.ValueKind != JsonValueKind.Object)
 				{
-					System.Diagnostics.Debug.WriteLine("Symbology validation failed: style must be an object");
+					_logger.LogWarning("Symbology validation failed: style must be an object");
 					return false;
 				}
 			}
@@ -462,7 +463,7 @@ public class CollectionsService : ICollectionsService
 		}
 		catch (JsonException ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Symbology validation failed: {ex.Message}");
+			_logger.LogWarning(ex, "Symbology validation failed");
 			return false;
 		}
 	}

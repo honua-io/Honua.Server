@@ -60,25 +60,41 @@ public class CommentsController : ControllerBase
             var ipAddress = this.HttpContext.Connection.RemoteIpAddress?.ToString();
             var userAgent = this.Request.Headers["User-Agent"].ToString();
 
-            var comment = await this.commentService.CreateCommentAsync(
-                mapId,
-                request.Author ?? userId,
-                request.CommentText,
-                userId,
-                request.LayerId,
-                request.FeatureId,
-                request.GeometryType ?? CommentGeometryType.Point,
-                request.Geometry,
-                request.Longitude,
-                request.Latitude,
-                request.ParentId,
-                request.Category,
-                request.Priority ?? CommentPriority.Medium,
-                request.Color,
-                false,
-                null,
-                ipAddress,
-                userAgent);
+            var parameters = new CreateCommentParameters
+            {
+                Target = new CommentTargetInfo
+                {
+                    MapId = mapId,
+                    LayerId = request.LayerId,
+                    FeatureId = request.FeatureId
+                },
+                Content = new CommentContentInfo
+                {
+                    CommentText = request.CommentText,
+                    GeometryType = request.GeometryType ?? CommentGeometryType.Point,
+                    Geometry = request.Geometry,
+                    Longitude = request.Longitude,
+                    Latitude = request.Latitude,
+                    ParentId = request.ParentId
+                },
+                Author = new CommentAuthorInfo
+                {
+                    Author = request.Author ?? userId,
+                    AuthorUserId = userId,
+                    IsGuest = false,
+                    GuestEmail = null,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent
+                },
+                Options = new CommentOptionsInfo
+                {
+                    Category = request.Category,
+                    Priority = request.Priority ?? CommentPriority.Medium,
+                    Color = request.Color
+                }
+            };
+
+            var comment = await this.commentService.CreateCommentAsync(parameters);
 
             // Broadcast to SignalR clients
             await this.commentHub.Clients.Group($"map_{mapId}")

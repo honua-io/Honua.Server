@@ -4,6 +4,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Honua.Server.Core.Data;
 using Honua.Server.Core.Metadata;
 
@@ -21,53 +23,54 @@ public static class ODataEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapODataEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        Console.WriteLine("========== MapODataEndpoints() CALLED ==========");
-        Console.WriteLine("Registering 8 OData endpoints...");
+        var logger = endpoints.ServiceProvider.GetService<ILogger<FeatureLayerODataHandlers>>();
+
+        logger?.LogDebug("Registering OData v4 endpoints");
 
         // Service root and metadata
-        Console.WriteLine("Registering: GET /odata (service document)");
+        logger?.LogDebug("Registering endpoint: GET /odata (service document)");
         endpoints.MapGet("/odata", FeatureLayerODataHandlers.GetServiceDocument)
             .WithName("OData_ServiceDocument")
             .WithTags("OData");
 
-        Console.WriteLine("Registering: GET /odata/$metadata (metadata)");
+        logger?.LogDebug("Registering endpoint: GET /odata/$metadata (metadata)");
         endpoints.MapGet("/odata/$metadata", FeatureLayerODataHandlers.GetMetadata)
             .WithName("OData_Metadata")
             .WithTags("OData");
 
         // Collection operations
-        Console.WriteLine("Registering: GET /odata/{entitySetName} (collection)");
+        logger?.LogDebug("Registering endpoint: GET /odata/{{entitySetName}} (collection)");
         endpoints.MapGet("/odata/{entitySetName}", FeatureLayerODataHandlers.GetFeatureCollection)
             .WithName("OData_GetCollection")
             .WithTags("OData");
 
-        Console.WriteLine("Registering: GET /odata/{entitySetName}/$count (count)");
+        logger?.LogDebug("Registering endpoint: GET /odata/{{entitySetName}}/$count (count)");
         endpoints.MapGet("/odata/{entitySetName}/$count", FeatureLayerODataHandlers.GetCollectionCount)
             .WithName("OData_GetCount")
             .WithTags("OData");
 
-        Console.WriteLine("Registering: POST /odata/{entitySetName} (create)");
+        logger?.LogDebug("Registering endpoint: POST /odata/{{entitySetName}} (create)");
         endpoints.MapPost("/odata/{entitySetName}", FeatureLayerODataHandlers.CreateFeature)
             .WithName("OData_CreateFeature")
             .WithTags("OData");
 
         // Single entity operations
-        Console.WriteLine("Registering: GET /odata/{entitySetName}({id}) (get single)");
+        logger?.LogDebug("Registering endpoint: GET /odata/{{entitySetName}}({{id}}) (get single)");
         endpoints.MapGet("/odata/{entitySetName}({id})", FeatureLayerODataHandlers.GetFeature)
             .WithName("OData_GetFeature")
             .WithTags("OData");
 
-        Console.WriteLine("Registering: PATCH /odata/{entitySetName}({id}) (update)");
+        logger?.LogDebug("Registering endpoint: PATCH /odata/{{entitySetName}}({{id}}) (update)");
         endpoints.MapPatch("/odata/{entitySetName}({id})", FeatureLayerODataHandlers.UpdateFeature)
             .WithName("OData_UpdateFeature")
             .WithTags("OData");
 
-        Console.WriteLine("Registering: DELETE /odata/{entitySetName}({id}) (delete)");
+        logger?.LogDebug("Registering endpoint: DELETE /odata/{{entitySetName}}({{id}}) (delete)");
         endpoints.MapDelete("/odata/{entitySetName}({id})", FeatureLayerODataHandlers.DeleteFeature)
             .WithName("OData_DeleteFeature")
             .WithTags("OData");
 
-        Console.WriteLine("========== MapODataEndpoints() COMPLETED - All 8 endpoints registered ==========");
+        logger?.LogInformation("Successfully registered 8 OData v4 endpoints");
         return endpoints;
     }
 }

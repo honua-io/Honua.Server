@@ -3,6 +3,7 @@
 
 using HonuaField.Models;
 using SQLite;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Data.Repositories;
 
@@ -13,10 +14,12 @@ namespace HonuaField.Data.Repositories;
 public class AttachmentRepository : IAttachmentRepository
 {
 	private readonly HonuaFieldDatabase _database;
+	private readonly ILogger<AttachmentRepository> _logger;
 
-	public AttachmentRepository(HonuaFieldDatabase database)
+	public AttachmentRepository(HonuaFieldDatabase database, ILogger<AttachmentRepository> logger)
 	{
 		_database = database;
+		_logger = logger;
 	}
 
 	#region CRUD Operations
@@ -51,7 +54,7 @@ public class AttachmentRepository : IAttachmentRepository
 		var conn = _database.GetConnection();
 		await conn.InsertAsync(attachment);
 
-		System.Diagnostics.Debug.WriteLine($"Attachment inserted: {attachment.Id}");
+		_logger.LogInformation("Attachment inserted: {AttachmentId}", attachment.Id);
 		return attachment.Id;
 	}
 
@@ -60,7 +63,7 @@ public class AttachmentRepository : IAttachmentRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAsync(attachment);
 
-		System.Diagnostics.Debug.WriteLine($"Attachment updated: {attachment.Id}");
+		_logger.LogInformation("Attachment updated: {AttachmentId}", attachment.Id);
 		return result;
 	}
 
@@ -71,7 +74,7 @@ public class AttachmentRepository : IAttachmentRepository
 			.Where(a => a.Id == id)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Attachment deleted: {id}");
+		_logger.LogInformation("Attachment deleted: {AttachmentId}", id);
 		return result;
 	}
 
@@ -82,7 +85,7 @@ public class AttachmentRepository : IAttachmentRepository
 			.Where(a => a.FeatureId == featureId)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Deleted {result} attachments for feature: {featureId}");
+		_logger.LogInformation("Deleted {Count} attachments for feature: {FeatureId}", result, featureId);
 		return result;
 	}
 
@@ -146,7 +149,7 @@ public class AttachmentRepository : IAttachmentRepository
 		var conn = _database.GetConnection();
 		var result = await conn.InsertAllAsync(attachments);
 
-		System.Diagnostics.Debug.WriteLine($"Batch inserted {result} attachments");
+		_logger.LogInformation("Batch inserted {Count} attachments", result);
 		return result;
 	}
 
@@ -155,7 +158,7 @@ public class AttachmentRepository : IAttachmentRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAllAsync(attachments);
 
-		System.Diagnostics.Debug.WriteLine($"Batch updated {result} attachments");
+		_logger.LogInformation("Batch updated {Count} attachments", result);
 		return result;
 	}
 
@@ -171,7 +174,7 @@ public class AttachmentRepository : IAttachmentRepository
 				.DeleteAsync();
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Batch deleted {result} attachments");
+		_logger.LogInformation("Batch deleted {Count} attachments", result);
 		return result;
 	}
 

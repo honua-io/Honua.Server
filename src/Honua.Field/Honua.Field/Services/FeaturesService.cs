@@ -3,6 +3,7 @@
 
 using HonuaField.Data.Repositories;
 using HonuaField.Models;
+using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
 using System.Text.Json;
 
@@ -18,17 +19,20 @@ public class FeaturesService : IFeaturesService
 	private readonly IAttachmentRepository _attachmentRepository;
 	private readonly IChangeRepository _changeRepository;
 	private readonly ICollectionRepository _collectionRepository;
+	private readonly ILogger<FeaturesService> _logger;
 
 	public FeaturesService(
 		IFeatureRepository featureRepository,
 		IAttachmentRepository attachmentRepository,
 		IChangeRepository changeRepository,
-		ICollectionRepository collectionRepository)
+		ICollectionRepository collectionRepository,
+		ILogger<FeaturesService> logger)
 	{
 		_featureRepository = featureRepository;
 		_attachmentRepository = attachmentRepository;
 		_changeRepository = changeRepository;
 		_collectionRepository = collectionRepository;
+		_logger = logger;
 	}
 
 	#region CRUD Operations
@@ -44,7 +48,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting feature {id}: {ex.Message}");
+			_logger.LogError(ex, "Error getting feature {FeatureId}", id);
 			throw;
 		}
 	}
@@ -66,7 +70,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting features for collection {collectionId}: {ex.Message}");
+			_logger.LogError(ex, "Error getting features for collection {CollectionId}", collectionId);
 			throw;
 		}
 	}
@@ -95,7 +99,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error creating feature: {ex.Message}");
+			_logger.LogError(ex, "Error creating feature");
 			throw;
 		}
 	}
@@ -112,7 +116,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error updating feature {feature.Id}: {ex.Message}");
+			_logger.LogError(ex, "Error updating feature {FeatureId}", feature.Id);
 			throw;
 		}
 	}
@@ -147,7 +151,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error deleting feature {id}: {ex.Message}");
+			_logger.LogError(ex, "Error deleting feature {FeatureId}", id);
 			throw;
 		}
 	}
@@ -189,7 +193,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error searching features: {ex.Message}");
+			_logger.LogError(ex, "Error searching features");
 			throw;
 		}
 	}
@@ -226,7 +230,8 @@ public class FeaturesService : IFeaturesService
 					}
 					else if (value is double doubleValue)
 					{
-						return Math.Abs(propertyValue.GetDouble() - doubleValue) < 0.0001;
+						const double NumericComparisonTolerance = 0.0001;
+						return Math.Abs(propertyValue.GetDouble() - doubleValue) < NumericComparisonTolerance;
 					}
 					else if (value is bool boolValue)
 					{
@@ -245,7 +250,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting features by property: {ex.Message}");
+			_logger.LogError(ex, "Error getting features by property");
 			throw;
 		}
 	}
@@ -275,7 +280,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting features in bounds: {ex.Message}");
+			_logger.LogError(ex, "Error getting features in bounds");
 			throw;
 		}
 	}
@@ -302,7 +307,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting nearby features: {ex.Message}");
+			_logger.LogError(ex, "Error getting nearby features");
 			throw;
 		}
 	}
@@ -347,7 +352,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting nearest feature: {ex.Message}");
+			_logger.LogError(ex, "Error getting nearest feature");
 			throw;
 		}
 	}
@@ -367,7 +372,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting attachments for feature {featureId}: {ex.Message}");
+			_logger.LogError(ex, "Error getting attachments for feature {FeatureId}", featureId);
 			throw;
 		}
 	}
@@ -390,7 +395,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error adding attachment: {ex.Message}");
+			_logger.LogError(ex, "Error adding attachment");
 			throw;
 		}
 	}
@@ -407,7 +412,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error deleting attachment {attachmentId}: {ex.Message}");
+			_logger.LogError(ex, "Error deleting attachment {AttachmentId}", attachmentId);
 			throw;
 		}
 	}
@@ -423,7 +428,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting attachments by type: {ex.Message}");
+			_logger.LogError(ex, "Error getting attachments by type");
 			throw;
 		}
 	}
@@ -443,7 +448,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting pending sync features: {ex.Message}");
+			_logger.LogError(ex, "Error getting pending sync features");
 			throw;
 		}
 	}
@@ -459,7 +464,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting pending changes count: {ex.Message}");
+			_logger.LogError(ex, "Error getting pending changes count");
 			throw;
 		}
 	}
@@ -476,7 +481,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error marking feature as synced: {ex.Message}");
+			_logger.LogError(ex, "Error marking feature as synced");
 			throw;
 		}
 	}
@@ -496,7 +501,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting feature count: {ex.Message}");
+			_logger.LogError(ex, "Error getting feature count");
 			throw;
 		}
 	}
@@ -512,7 +517,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting collection extent: {ex.Message}");
+			_logger.LogError(ex, "Error getting collection extent");
 			throw;
 		}
 	}
@@ -528,7 +533,7 @@ public class FeaturesService : IFeaturesService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting attachments size: {ex.Message}");
+			_logger.LogError(ex, "Error getting attachments size");
 			throw;
 		}
 	}

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace Honua.Admin.Blazor.Shared.Services;
@@ -13,12 +14,14 @@ namespace Honua.Admin.Blazor.Shared.Services;
 public class TouchGestureService : IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
+    private readonly ILogger<TouchGestureService> _logger;
     private readonly List<string> _activeGestures = new();
     private bool _disposed = false;
 
-    public TouchGestureService(IJSRuntime jsRuntime)
+    public TouchGestureService(IJSRuntime jsRuntime, ILogger<TouchGestureService> logger)
     {
         _jsRuntime = jsRuntime;
+        _logger = logger;
     }
 
     /// <summary>
@@ -47,7 +50,7 @@ public class TouchGestureService : IAsyncDisposable
         }
         catch (JSException ex)
         {
-            Console.WriteLine($"Error initializing pull-to-refresh: {ex.Message}");
+            _logger.LogWarning(ex, "Error initializing pull-to-refresh gesture for element {ElementId}", elementId);
             return null;
         }
     }
@@ -80,7 +83,7 @@ public class TouchGestureService : IAsyncDisposable
         }
         catch (JSException ex)
         {
-            Console.WriteLine($"Error initializing swipe-to-delete: {ex.Message}");
+            _logger.LogWarning(ex, "Error initializing swipe-to-delete gesture for row {RowId}, item {ItemId}", rowId, itemId);
             return null;
         }
     }
@@ -111,7 +114,7 @@ public class TouchGestureService : IAsyncDisposable
         }
         catch (JSException ex)
         {
-            Console.WriteLine($"Error initializing swipe navigation: {ex.Message}");
+            _logger.LogWarning(ex, "Error initializing swipe navigation gesture for element {ElementId}", elementId);
             return null;
         }
     }
@@ -131,7 +134,7 @@ public class TouchGestureService : IAsyncDisposable
         }
         catch (JSException ex)
         {
-            Console.WriteLine($"Error disposing gesture {gestureId}: {ex.Message}");
+            _logger.LogWarning(ex, "Error disposing gesture {GestureId}", gestureId);
         }
     }
 
@@ -147,7 +150,7 @@ public class TouchGestureService : IAsyncDisposable
         }
         catch (JSException ex)
         {
-            Console.WriteLine($"Error disposing all gestures: {ex.Message}");
+            _logger.LogWarning(ex, "Error disposing all gestures");
         }
     }
 

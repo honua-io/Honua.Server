@@ -4,6 +4,7 @@
 using HonuaField.Models.FormBuilder;
 using System.Text.Json;
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Services;
 
@@ -254,7 +255,7 @@ public class FormBuilderService : IFormBuilderService
 			}
 			catch (Exception ex)
 			{
-				System.Diagnostics.Debug.WriteLine($"Error parsing property '{propertyName}': {ex.Message}");
+				_logger.LogWarning(ex, \"Error parsing property '{PropertyName}'\", propertyName);
 				// Continue with other properties
 			}
 		}

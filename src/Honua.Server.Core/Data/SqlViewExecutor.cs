@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data;
 
@@ -20,6 +21,13 @@ namespace Honua.Server.Core.Data;
 /// </summary>
 public sealed class SqlViewExecutor
 {
+    private readonly ILogger<SqlViewExecutor> _logger;
+
+    public SqlViewExecutor(ILogger<SqlViewExecutor> logger)
+    {
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<SqlViewExecutor>.Instance;
+    }
+
     /// <summary>
     /// Processes a SQL view query by substituting parameters safely.
     /// Returns the processed SQL and a dictionary of parameter values for use with parameterized queries.
@@ -28,7 +36,7 @@ public sealed class SqlViewExecutor
     /// <param name="requestParameters">Parameters from the HTTP request.</param>
     /// <param name="layerId">Layer ID for error messages.</param>
     /// <returns>A tuple containing the processed SQL and parameter values.</returns>
-    public static (string Sql, IReadOnlyDictionary<string, object?> Parameters) ProcessSqlView(
+    public (string Sql, IReadOnlyDictionary<string, object?> Parameters) ProcessSqlView(
         SqlViewDefinition sqlView,
         IReadOnlyDictionary<string, string> requestParameters,
         string layerId)
@@ -71,7 +79,7 @@ public sealed class SqlViewExecutor
     /// <summary>
     /// Gets the parameter value from the request or returns the default value.
     /// </summary>
-    private static string? GetParameterValue(
+    private string? GetParameterValue(
         SqlViewParameterDefinition paramDef,
         IReadOnlyDictionary<string, string> requestParameters)
     {
@@ -101,7 +109,7 @@ public sealed class SqlViewExecutor
     /// <summary>
     /// Validates and converts a parameter value to its typed representation.
     /// </summary>
-    private static object? ValidateAndConvertParameter(
+    private object? ValidateAndConvertParameter(
         SqlViewParameterDefinition paramDef,
         string? rawValue,
         string layerId)
@@ -132,7 +140,7 @@ public sealed class SqlViewExecutor
     /// <summary>
     /// Validates a parameter value against its validation rules.
     /// </summary>
-    private static void ValidateParameterValue(SqlViewParameterDefinition paramDef, string value)
+    private void ValidateParameterValue(SqlViewParameterDefinition paramDef, string value)
     {
         var validation = paramDef.Validation!;
         var errorMessage = validation.ErrorMessage ?? "Validation failed";
@@ -207,7 +215,7 @@ public sealed class SqlViewExecutor
     /// <summary>
     /// Converts a parameter value from string to its typed representation.
     /// </summary>
-    private static object ConvertParameterValue(SqlViewParameterDefinition paramDef, string value)
+    private object ConvertParameterValue(SqlViewParameterDefinition paramDef, string value)
     {
         try
         {
@@ -238,7 +246,7 @@ public sealed class SqlViewExecutor
     /// Replaces parameter placeholders in the SQL with database-specific parameter names.
     /// This converts `:paramName` to `@paramKey` for use in parameterized queries.
     /// </summary>
-    private static string ReplaceParameterPlaceholder(string sql, string parameterName, string parameterKey)
+    private string ReplaceParameterPlaceholder(string sql, string parameterName, string parameterKey)
     {
         // Replace :paramName with @paramKey
         // We use word boundaries to ensure we only replace the exact parameter
@@ -267,7 +275,7 @@ public sealed class SqlViewExecutor
     /// Applies a security filter to the SQL query by wrapping it in a subquery.
     /// This ensures the security filter is always applied.
     /// </summary>
-    private static string ApplySecurityFilter(string sql, string securityFilter)
+    private string ApplySecurityFilter(string sql, string securityFilter)
     {
         // Wrap the original SQL in a subquery and apply the security filter
         var sb = new StringBuilder();
@@ -333,9 +341,35 @@ public sealed class SqlViewExecutor
         {
             if (!referencedParams.Contains(param.Name))
             {
-                System.Diagnostics.Debug.WriteLine(
-                    $"Warning: SQL view for layer '{layerId}' defines parameter '{param.Name}' but it is not used in the SQL query");
+                _logger.LogWarning("SQL view for layer {LayerId} defines parameter {ParameterName} but it is not used in the SQL query", layerId, param.Name);
             }
         }
+    }
+
+    /// <summary>
+    /// Validates that all parameters referenced in the SQL are defined (static version).
+    /// This is called during metadata validation.
+    /// </summary>
+    public static void ValidateParameterReferencesStatic(SqlViewDefinition sqlView, string layerId)
+    {
+        Guard.NotNull(sqlView);
+        Guard.NotNullOrWhiteSpace(layerId);
+
+        var referencedParams = ExtractParameterNames(sqlView.Sql);
+        var definedParams = new HashSet<string>(
+            sqlView.Parameters.Select(p => p.Name),
+            StringComparer.OrdinalIgnoreCase);
+
+        // Check for referenced but not defined parameters
+        foreach (var referencedParam in referencedParams)
+        {
+            if (!definedParams.Contains(referencedParam))
+            {
+                throw new InvalidOperationException(
+                    $"SQL view for layer '{layerId}' references parameter ':{referencedParam}' but it is not defined in the parameters list");
+            }
+        }
+
+        // Check for defined but not referenced parameters - no logging in static version
     }
 }

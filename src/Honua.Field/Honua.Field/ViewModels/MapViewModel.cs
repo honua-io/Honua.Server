@@ -17,6 +17,7 @@ using Mapsui.UI;
 using NetTopologySuite.Geometries;
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -213,7 +214,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 
 			IsMapInitialized = true;
 
-			System.Diagnostics.Debug.WriteLine("Map initialized successfully");
+			_logger.LogInformation("Map initialized successfully");
 		}
 		catch (Exception ex)
 		{
@@ -243,7 +244,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 		tileLayer.Name = "BaseMap";
 		_map.Layers.Add(tileLayer);
 
-		System.Diagnostics.Debug.WriteLine("Base map layer initialized");
+		_logger.LogInformation("Base map layer initialized");
 	}
 
 	/// <summary>
@@ -269,11 +270,11 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				Layers.Add(layerInfo);
 			}
 
-			System.Diagnostics.Debug.WriteLine($"Loaded {Layers.Count} collections");
+			_logger.LogInformation("Loaded {Count} collections", Layers.Count);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading collections: {ex.Message}");
+			_logger.LogError(ex, "Error loading collections");
 		}
 	}
 
@@ -325,11 +326,11 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				_featuresLayer.Add(mapFeature);
 			}
 
-			System.Diagnostics.Debug.WriteLine($"Loaded {features.Count} features to map");
+			_logger.LogInformation("Loaded {Count} features to map", features.Count);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading features: {ex.Message}");
+			_logger.LogError(ex, "Error loading features");
 		}
 	}
 
@@ -355,7 +356,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error projecting geometry: {ex.Message}");
+			_logger.LogError(ex, "Error projecting geometry");
 			return null;
 		}
 	}
@@ -400,7 +401,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error creating style from symbology: {ex.Message}");
+			_logger.LogError(ex, "Error creating style from symbology");
 			return CreateDefaultStyle(geometryType);
 		}
 	}
@@ -461,7 +462,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error generating legend: {ex.Message}");
+			_logger.LogError(ex, "Error generating legend");
 			return new List<LegendItem>();
 		}
 	}
@@ -504,7 +505,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			// Update current location marker
 			UpdateCurrentLocationMarker(location);
 
-			System.Diagnostics.Debug.WriteLine($"Zoomed to location: {location.Latitude}, {location.Longitude}");
+			_logger.LogInformation("Zoomed to location: {Latitude}, {Longitude}", location.Latitude, location.Longitude);
 		}
 		catch (Exception ex)
 		{
@@ -554,7 +555,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			MapCenterLatitude = centroid.Y;
 			MapCenterLongitude = centroid.X;
 
-			System.Diagnostics.Debug.WriteLine($"Zoomed to feature: {featureId}");
+			_logger.LogInformation("Zoomed to feature: {FeatureId}", featureId);
 		}
 		catch (Exception ex)
 		{
@@ -590,12 +591,12 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				// Highlight selected feature
 				HighlightFeature(featureId);
 
-				System.Diagnostics.Debug.WriteLine($"Selected feature: {featureId}");
+				_logger.LogInformation("Selected feature: {FeatureId}", featureId);
 			}
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error selecting feature: {ex.Message}");
+			_logger.LogError(ex, "Error selecting feature");
 		}
 	}
 
@@ -613,7 +614,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			_drawingLayer.Clear();
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Started drawing in mode: {mode}");
+		_logger.LogInformation("Started drawing in mode: {Mode}", mode);
 	}
 
 	/// <summary>
@@ -629,14 +630,14 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				_locationService.LocationChanged -= OnLocationUpdated;
 				await _locationService.StopTrackingAsync();
 				IsTrackingLocation = false;
-				System.Diagnostics.Debug.WriteLine("Location tracking stopped");
+				_logger.LogInformation("Location tracking stopped");
 			}
 			else
 			{
 				_locationService.LocationChanged += OnLocationUpdated;
 				await _locationService.StartTrackingAsync();
 				IsTrackingLocation = true;
-				System.Diagnostics.Debug.WriteLine("Location tracking started");
+				_logger.LogInformation("Location tracking started");
 			}
 		}
 		catch (Exception ex)
@@ -663,7 +664,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			GpsTrackPoints.Clear();
 		}
 
-		System.Diagnostics.Debug.WriteLine($"GPS track visibility: {ShowGpsTrack}");
+		_logger.LogInformation("GPS track visibility: {ShowGpsTrack}", ShowGpsTrack);
 	}
 
 	/// <summary>
@@ -683,7 +684,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Base map visibility: {IsBaseMapVisible}");
+		_logger.LogInformation("Base map visibility: {IsBaseMapVisible}", IsBaseMapVisible);
 	}
 
 	/// <summary>
@@ -703,7 +704,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			// Refresh features to apply visibility change
 			await LoadFeaturesAsync();
 
-			System.Diagnostics.Debug.WriteLine($"Toggled layer {layer.Name} visibility: {layer.IsVisible}");
+			_logger.LogInformation("Toggled layer {LayerName} visibility: {IsVisible}", layer.Name, layer.IsVisible);
 		}
 	}
 
@@ -729,11 +730,11 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			var features = await _featureRepository.GetByBoundsAsync(minLon, minLat, maxLon, maxLat);
 			FeaturesInView = features.Count;
 
-			System.Diagnostics.Debug.WriteLine($"Features in view: {FeaturesInView}");
+			_logger.LogInformation("Features in view: {Count}", FeaturesInView);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error getting features in view: {ex.Message}");
+			_logger.LogError(ex, "Error getting features in view");
 		}
 	}
 
@@ -750,13 +751,13 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 
 			var features = await _featureRepository.GetWithinDistanceAsync(point, parameters.radiusMeters);
 
-			System.Diagnostics.Debug.WriteLine($"Found {features.Count} features within {parameters.radiusMeters}m");
+			_logger.LogInformation("Found {Count} features within {RadiusMeters}m", features.Count, parameters.radiusMeters);
 
 			return features;
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error finding nearby features: {ex.Message}");
+			_logger.LogError(ex, "Error finding nearby features");
 			return new List<Feature>();
 		}
 	}
@@ -792,7 +793,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			_map.Navigator.CenterOn(centerX, centerY);
 			_map.Navigator.ZoomToBox(new MRect(projMinX, projMinY, projMaxX, projMaxY));
 
-			System.Diagnostics.Debug.WriteLine("Zoomed to all features");
+			_logger.LogInformation("Zoomed to all features");
 		}
 		catch (Exception ex)
 		{
@@ -813,7 +814,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 
 		UpdateDrawingLayer();
 
-		System.Diagnostics.Debug.WriteLine($"Added drawing point: {latitude}, {longitude}");
+		_logger.LogInformation("Added drawing point: {Latitude}, {Longitude}", latitude, longitude);
 	}
 
 	/// <summary>
@@ -858,7 +859,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			{
 				// Feature creation would happen here
 				// For now, just clear the drawing
-				System.Diagnostics.Debug.WriteLine($"Completed drawing: {CurrentDrawingMode}");
+				_logger.LogInformation("Completed drawing: {DrawingMode}", CurrentDrawingMode);
 			}
 
 			// Reset drawing
@@ -890,7 +891,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			_drawingLayer.Clear();
 		}
 
-		System.Diagnostics.Debug.WriteLine("Drawing cancelled");
+		_logger.LogInformation("Drawing cancelled");
 	}
 
 	#endregion
@@ -1057,11 +1058,11 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 				OfflineMaps.Add(map);
 			}
 
-			System.Diagnostics.Debug.WriteLine($"Loaded {OfflineMaps.Count} offline maps");
+			_logger.LogInformation("Loaded {Count} offline maps", OfflineMaps.Count);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error loading offline maps: {ex.Message}");
+			_logger.LogError(ex, "Error loading offline maps");
 		}
 	}
 
@@ -1105,7 +1106,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			CurrentOfflineMapId = mapId;
 			UseOfflineMap = true;
 
-			System.Diagnostics.Debug.WriteLine($"Switched to offline map: {mapId}");
+			_logger.LogInformation("Switched to offline map: {MapId}", mapId);
 		}
 		catch (Exception ex)
 		{
@@ -1145,7 +1146,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 			CurrentOfflineMapId = null;
 			UseOfflineMap = false;
 
-			System.Diagnostics.Debug.WriteLine("Switched to online map");
+			_logger.LogInformation("Switched to online map");
 		}
 		catch (Exception ex)
 		{
@@ -1343,7 +1344,7 @@ public partial class MapViewModel : BaseViewModel, IDisposable
 
 		// In a full implementation, this would add a highlight style
 		// to the selected feature
-		System.Diagnostics.Debug.WriteLine($"Highlighting feature: {featureId}");
+		_logger.LogInformation("Highlighting feature: {FeatureId}", featureId);
 	}
 
 	#endregion

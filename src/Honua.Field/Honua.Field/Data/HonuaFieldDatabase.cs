@@ -3,6 +3,7 @@
 
 using SQLite;
 using HonuaField.Models;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Data;
 
@@ -14,11 +15,13 @@ public class HonuaFieldDatabase
 {
 	private readonly SQLiteAsyncConnection _database;
 	private readonly string _databasePath;
+	private readonly ILogger<HonuaFieldDatabase> _logger;
 	private bool _isInitialized = false;
 
-	public HonuaFieldDatabase(string databasePath)
+	public HonuaFieldDatabase(string databasePath, ILogger<HonuaFieldDatabase> logger)
 	{
 		_databasePath = databasePath;
+		_logger = logger;
 		_database = new SQLiteAsyncConnection(databasePath,
 			SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create | SQLiteOpenFlags.SharedCache);
 	}
@@ -50,11 +53,11 @@ public class HonuaFieldDatabase
 
 			_isInitialized = true;
 
-			System.Diagnostics.Debug.WriteLine($"Database initialized at: {_databasePath}");
+			_logger.LogInformation("Database initialized at path: {DatabasePath}", _databasePath);
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error initializing database: {ex.Message}");
+			_logger.LogError(ex, "Error initializing database");
 			throw;
 		}
 	}
@@ -101,11 +104,11 @@ public class HonuaFieldDatabase
 			// Note: Spatial R-tree indexes for geometry will be created separately
 			// in the repository layer using NetTopologySuite extensions
 
-			System.Diagnostics.Debug.WriteLine("Database indexes created successfully");
+			_logger.LogInformation("Database indexes created successfully");
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error creating indexes: {ex.Message}");
+			_logger.LogWarning(ex, "Error creating indexes");
 			// Don't throw - indexes are optional for functionality
 		}
 	}
@@ -121,7 +124,7 @@ public class HonuaFieldDatabase
 			// Get current schema version
 			var version = await GetSchemaVersionAsync();
 
-			System.Diagnostics.Debug.WriteLine($"Current database schema version: {version}");
+			_logger.LogInformation("Current database schema version: {Version}", version);
 
 			// Run migrations in sequence
 			if (version < 1)
@@ -136,7 +139,7 @@ public class HonuaFieldDatabase
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Error running migrations: {ex.Message}");
+			_logger.LogError(ex, "Error running migrations");
 			throw;
 		}
 	}
@@ -172,7 +175,7 @@ public class HonuaFieldDatabase
 		await _database.ExecuteAsync(
 			"INSERT INTO schema_info (version) VALUES (?)", version);
 
-		System.Diagnostics.Debug.WriteLine($"Schema version updated to: {version}");
+		_logger.LogInformation("Schema version updated to: {Version}", version);
 	}
 
 	/// <summary>
@@ -197,7 +200,7 @@ public class HonuaFieldDatabase
 		await _database.CloseAsync();
 		_isInitialized = false;
 
-		System.Diagnostics.Debug.WriteLine("Database connection closed");
+		_logger.LogInformation("Database connection closed");
 	}
 
 	/// <summary>
@@ -213,7 +216,7 @@ public class HonuaFieldDatabase
 		await _database.DeleteAllAsync<GpsTrackPoint>();
 		await _database.DeleteAllAsync<GpsTrack>();
 
-		System.Diagnostics.Debug.WriteLine("All database data cleared");
+		_logger.LogInformation("All database data cleared");
 	}
 
 	/// <summary>

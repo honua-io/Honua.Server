@@ -24,8 +24,82 @@ public class CommentService
     }
 
     /// <summary>
-    /// Creates a new comment
+    /// Creates a new comment using a parameter object
     /// </summary>
+    /// <param name="parameters">The comment creation parameters</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created comment</returns>
+    /// <exception cref="ArgumentException">Thrown when geometry type or priority is invalid</exception>
+    public async Task<MapComment> CreateCommentAsync(
+        CreateCommentParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        // Validate inputs
+        if (!CommentGeometryType.IsValid(parameters.Content.GeometryType))
+            throw new ArgumentException($"Invalid geometry type: {parameters.Content.GeometryType}", nameof(parameters));
+
+        var priority = parameters.Options?.Priority ?? CommentPriority.Medium;
+        if (!CommentPriority.IsValid(priority))
+            throw new ArgumentException($"Invalid priority: {priority}", nameof(parameters));
+
+        // Calculate thread depth
+        int threadDepth = 0;
+        if (!string.IsNullOrEmpty(parameters.Content.ParentId))
+        {
+            var parent = await _repository.GetCommentByIdAsync(parameters.Content.ParentId, cancellationToken);
+            if (parent != null)
+            {
+                threadDepth = parent.ThreadDepth + 1;
+            }
+        }
+
+        // Extract @mentions from comment text
+        var mentionedUsers = ExtractMentions(parameters.Content.CommentText);
+
+        var comment = new MapComment
+        {
+            Id = Guid.NewGuid().ToString(),
+            MapId = parameters.Target.MapId,
+            LayerId = parameters.Target.LayerId,
+            FeatureId = parameters.Target.FeatureId,
+            Author = parameters.Author.Author,
+            AuthorUserId = parameters.Author.AuthorUserId,
+            IsGuest = parameters.Author.IsGuest,
+            GuestEmail = parameters.Author.GuestEmail,
+            CommentText = parameters.Content.CommentText,
+            GeometryType = parameters.Content.GeometryType,
+            Geometry = parameters.Content.Geometry,
+            Longitude = parameters.Content.Longitude,
+            Latitude = parameters.Content.Latitude,
+            CreatedAt = DateTime.UtcNow,
+            ParentId = parameters.Content.ParentId,
+            ThreadDepth = threadDepth,
+            Status = CommentStatus.Open,
+            Category = parameters.Options?.Category,
+            Priority = priority,
+            Color = parameters.Options?.Color,
+            IsApproved = !parameters.Author.IsGuest, // Auto-approve authenticated users
+            IpAddress = parameters.Author.IpAddress,
+            UserAgent = parameters.Author.UserAgent,
+            MentionedUsers = mentionedUsers.Count > 0 ? JsonSerializer.Serialize(mentionedUsers) : null
+        };
+
+        await _repository.CreateCommentAsync(comment, cancellationToken);
+
+        _logger.LogInformation("Created comment {CommentId} on map {MapId} by {Author}",
+            comment.Id, parameters.Target.MapId, parameters.Author.Author);
+
+        return comment;
+    }
+
+    /// <summary>
+    /// Creates a new comment (legacy method signature)
+    /// </summary>
+    /// <remarks>
+    /// This method is maintained for backward compatibility. New code should use the overload
+    /// that accepts <see cref="CreateCommentParameters"/> instead.
+    /// </remarks>
+    [Obsolete("Use the overload that accepts CreateCommentParameters instead. This method will be removed in a future version.")]
     public async Task<MapComment> CreateCommentAsync(
         string mapId,
         string author,
@@ -47,61 +121,42 @@ public class CommentService
         string? userAgent = null,
         CancellationToken cancellationToken = default)
     {
-        // Validate inputs
-        if (!CommentGeometryType.IsValid(geometryType))
-            throw new ArgumentException($"Invalid geometry type: {geometryType}", nameof(geometryType));
-
-        if (!CommentPriority.IsValid(priority))
-            throw new ArgumentException($"Invalid priority: {priority}", nameof(priority));
-
-        // Calculate thread depth
-        int threadDepth = 0;
-        if (!string.IsNullOrEmpty(parentId))
+        // Delegate to the new parameter object method
+        var parameters = new CreateCommentParameters
         {
-            var parent = await _repository.GetCommentByIdAsync(parentId, cancellationToken);
-            if (parent != null)
+            Target = new CommentTargetInfo
             {
-                threadDepth = parent.ThreadDepth + 1;
+                MapId = mapId,
+                LayerId = layerId,
+                FeatureId = featureId
+            },
+            Content = new CommentContentInfo
+            {
+                CommentText = commentText,
+                GeometryType = geometryType,
+                Geometry = geometry,
+                Longitude = longitude,
+                Latitude = latitude,
+                ParentId = parentId
+            },
+            Author = new CommentAuthorInfo
+            {
+                Author = author,
+                AuthorUserId = authorUserId,
+                IsGuest = isGuest,
+                GuestEmail = guestEmail,
+                IpAddress = ipAddress,
+                UserAgent = userAgent
+            },
+            Options = new CommentOptionsInfo
+            {
+                Category = category,
+                Priority = priority,
+                Color = color
             }
-        }
-
-        // Extract @mentions from comment text
-        var mentionedUsers = ExtractMentions(commentText);
-
-        var comment = new MapComment
-        {
-            Id = Guid.NewGuid().ToString(),
-            MapId = mapId,
-            LayerId = layerId,
-            FeatureId = featureId,
-            Author = author,
-            AuthorUserId = authorUserId,
-            IsGuest = isGuest,
-            GuestEmail = guestEmail,
-            CommentText = commentText,
-            GeometryType = geometryType,
-            Geometry = geometry,
-            Longitude = longitude,
-            Latitude = latitude,
-            CreatedAt = DateTime.UtcNow,
-            ParentId = parentId,
-            ThreadDepth = threadDepth,
-            Status = CommentStatus.Open,
-            Category = category,
-            Priority = priority,
-            Color = color,
-            IsApproved = !isGuest, // Auto-approve authenticated users
-            IpAddress = ipAddress,
-            UserAgent = userAgent,
-            MentionedUsers = mentionedUsers.Count > 0 ? JsonSerializer.Serialize(mentionedUsers) : null
         };
 
-        await _repository.CreateCommentAsync(comment, cancellationToken);
-
-        _logger.LogInformation("Created comment {CommentId} on map {MapId} by {Author}",
-            comment.Id, mapId, author);
-
-        return comment;
+        return await CreateCommentAsync(parameters, cancellationToken);
     }
 
     /// <summary>

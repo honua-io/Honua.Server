@@ -3,6 +3,7 @@
 
 using HonuaField.Models;
 using SQLite;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.Data.Repositories;
 
@@ -13,10 +14,12 @@ namespace HonuaField.Data.Repositories;
 public class ChangeRepository : IChangeRepository
 {
 	private readonly HonuaFieldDatabase _database;
+	private readonly ILogger<ChangeRepository> _logger;
 
-	public ChangeRepository(HonuaFieldDatabase database)
+	public ChangeRepository(HonuaFieldDatabase database, ILogger<ChangeRepository> logger)
 	{
 		_database = database;
+		_logger = logger;
 	}
 
 	#region CRUD Operations
@@ -54,8 +57,8 @@ public class ChangeRepository : IChangeRepository
 		var conn = _database.GetConnection();
 		var result = await conn.InsertAsync(change);
 
-		System.Diagnostics.Debug.WriteLine(
-			$"Change tracked: {change.Operation} for feature {change.FeatureId}");
+		_logger.LogInformation("Change tracked: {Operation} for feature {FeatureId}",
+			change.Operation, change.FeatureId);
 
 		return result;
 	}
@@ -67,7 +70,7 @@ public class ChangeRepository : IChangeRepository
 			.Where(c => c.Id == id)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Change deleted: {id}");
+		_logger.LogInformation("Change deleted: {ChangeId}", id);
 		return result;
 	}
 
@@ -78,7 +81,7 @@ public class ChangeRepository : IChangeRepository
 			.Where(c => c.FeatureId == featureId)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Deleted {result} changes for feature: {featureId}");
+		_logger.LogInformation("Deleted {Count} changes for feature: {FeatureId}", result, featureId);
 		return result;
 	}
 
@@ -115,7 +118,7 @@ public class ChangeRepository : IChangeRepository
 		var conn = _database.GetConnection();
 		var result = await conn.UpdateAsync(change);
 
-		System.Diagnostics.Debug.WriteLine($"Change marked as synced: {id}");
+		_logger.LogInformation("Change marked as synced: {ChangeId}", id);
 		return result;
 	}
 
@@ -134,7 +137,7 @@ public class ChangeRepository : IChangeRepository
 			}
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Marked {result} changes as synced");
+		_logger.LogInformation("Marked {Count} changes as synced", result);
 		return result;
 	}
 
@@ -178,7 +181,7 @@ public class ChangeRepository : IChangeRepository
 		var conn = _database.GetConnection();
 		var result = await conn.InsertAllAsync(changes);
 
-		System.Diagnostics.Debug.WriteLine($"Batch inserted {result} changes");
+		_logger.LogInformation("Batch inserted {Count} changes", result);
 		return result;
 	}
 
@@ -194,7 +197,7 @@ public class ChangeRepository : IChangeRepository
 				.DeleteAsync();
 		}
 
-		System.Diagnostics.Debug.WriteLine($"Batch deleted {result} changes");
+		_logger.LogInformation("Batch deleted {Count} changes", result);
 		return result;
 	}
 
@@ -205,7 +208,7 @@ public class ChangeRepository : IChangeRepository
 			.Where(c => c.Synced == 1)
 			.DeleteAsync();
 
-		System.Diagnostics.Debug.WriteLine($"Cleared {result} synced changes");
+		_logger.LogInformation("Cleared {Count} synced changes", result);
 		return result;
 	}
 

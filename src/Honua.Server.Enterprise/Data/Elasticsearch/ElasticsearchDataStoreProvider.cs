@@ -13,6 +13,7 @@ using Honua.Server.Core.Data;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Utilities;
+using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Enterprise.Data.Elasticsearch;
 
@@ -29,6 +30,7 @@ public sealed partial class ElasticsearchDataStoreProvider : IDataStoreProvider,
 
     private readonly ConcurrentDictionary<string, ElasticsearchConnection> _connections = new(StringComparer.Ordinal);
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly ILogger<ElasticsearchDataStoreProvider> _logger;
     private bool _disposed;
 
     private const int DefaultTermsSize = 1000;
@@ -42,16 +44,18 @@ public sealed partial class ElasticsearchDataStoreProvider : IDataStoreProvider,
     /// <summary>
     /// Creates a new ElasticsearchDataStoreProvider.
     /// </summary>
-    public ElasticsearchDataStoreProvider() : this(null)
+    public ElasticsearchDataStoreProvider(ILogger<ElasticsearchDataStoreProvider> logger) : this(logger, null)
     {
     }
 
     /// <summary>
     /// Creates a new ElasticsearchDataStoreProvider.
     /// </summary>
+    /// <param name="logger">Logger instance for structured logging.</param>
     /// <param name="httpClientFactory">Optional IHttpClientFactory for proper connection pooling (recommended).</param>
-    public ElasticsearchDataStoreProvider(IHttpClientFactory? httpClientFactory)
+    public ElasticsearchDataStoreProvider(ILogger<ElasticsearchDataStoreProvider> logger, IHttpClientFactory? httpClientFactory)
     {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClientFactory = httpClientFactory;
     }
 

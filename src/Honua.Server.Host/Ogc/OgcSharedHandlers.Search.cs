@@ -42,6 +42,7 @@ using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using Microsoft.Net.Http.Headers;
 using NetTopologySuite.Geometries;
@@ -67,6 +68,7 @@ internal static partial class OgcSharedHandlers
         IApiMetrics apiMetrics,
         OgcCacheHeaderService cacheHeaderService,
         Services.IOgcFeaturesAttachmentHandler attachmentHandler,
+        ILogger? logger,
         CancellationToken cancellationToken)
     {
         static QueryCollection RemoveCollectionsParameter(IQueryCollection source)
@@ -119,21 +121,37 @@ internal static partial class OgcSharedHandlers
             var sanitized = RemoveCollectionsParameter(queryParameters);
             return await OgcFeaturesHandlers.ExecuteCollectionItemsAsync(
                 collections[0],
-                request,
+                new OgcFeaturesRequestContext
+                {
+                    Request = request,
+                    QueryOverrides = sanitized
+                },
                 resolver,
                 repository,
-                geoPackageExporter,
-                shapefileExporter,
-                flatGeobufExporter,
-                geoArrowExporter,
-                csvExporter,
-                attachmentOrchestrator,
                 metadataRegistry,
-                apiMetrics,
-                cacheHeaderService,
-                attachmentHandler,
-                new Core.Elevation.DefaultElevationService(),
-                sanitized,
+                new OgcFeatureExportServices
+                {
+                    GeoPackage = geoPackageExporter,
+                    Shapefile = shapefileExporter,
+                    FlatGeobuf = flatGeobufExporter,
+                    GeoArrow = geoArrowExporter,
+                    Csv = csvExporter
+                },
+                new OgcFeatureAttachmentServices
+                {
+                    Orchestrator = attachmentOrchestrator,
+                    Handler = attachmentHandler
+                },
+                new OgcFeatureEnrichmentServices
+                {
+                    Elevation = new Core.Elevation.DefaultElevationService()
+                },
+                new OgcFeatureObservabilityServices
+                {
+                    Metrics = apiMetrics,
+                    CacheHeaders = cacheHeaderService,
+                    Logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance
+                },
                 cancellationToken).ConfigureAwait(false);
         }
 

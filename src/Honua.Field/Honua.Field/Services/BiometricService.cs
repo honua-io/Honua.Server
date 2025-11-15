@@ -17,7 +17,7 @@ public partial class BiometricService : IBiometricService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Biometric availability check failed: {ex.Message}");
+			_logger.LogError(ex, "Biometric availability check failed");
 			return false;
 		}
 	}
@@ -30,7 +30,7 @@ public partial class BiometricService : IBiometricService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Get biometric type failed: {ex.Message}");
+			_logger.LogError(ex, "Get biometric type failed");
 			return BiometricType.None;
 		}
 	}
@@ -55,7 +55,7 @@ public partial class BiometricService : IBiometricService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Biometric authentication failed: {ex.Message}");
+			_logger.LogError(ex, "Biometric authentication failed");
 			return BiometricResult.Failed(ex.Message, BiometricErrorType.Unknown);
 		}
 	}
@@ -68,7 +68,7 @@ public partial class BiometricService : IBiometricService
 		}
 		catch (Exception ex)
 		{
-			System.Diagnostics.Debug.WriteLine($"Biometric enrollment check failed: {ex.Message}");
+			_logger.LogError(ex, "Biometric enrollment check failed");
 			return false;
 		}
 	}

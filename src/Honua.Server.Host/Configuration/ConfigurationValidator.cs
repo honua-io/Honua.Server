@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Honua.Server.Host.Utilities;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Core.Extensions;
@@ -21,8 +22,9 @@ public static class ConfigurationValidator
     /// DATA INTEGRITY: Ensures configuration meets minimum requirements before server starts.
     /// </summary>
     /// <param name="configuration">The application configuration to validate.</param>
+    /// <param name="logger">Logger for diagnostic messages.</param>
     /// <exception cref="InvalidOperationException">Thrown when configuration is invalid.</exception>
-    public static void ValidateOnStartup(IConfiguration configuration)
+    public static void ValidateOnStartup(IConfiguration configuration, ILogger? logger = null)
     {
         Guard.NotNull(configuration);
 
@@ -41,7 +43,7 @@ public static class ConfigurationValidator
         ValidateRequestLimits(configuration, errors);
 
         // Validate metadata paths
-        ValidateMetadataPaths(configuration, errors);
+        ValidateMetadataPaths(configuration, errors, logger);
 
         // Validate security settings
         ValidateSecuritySettings(configuration, errors);
@@ -189,7 +191,7 @@ public static class ConfigurationValidator
         }
     }
 
-    private static void ValidateMetadataPaths(IConfiguration configuration, List<string> errors)
+    private static void ValidateMetadataPaths(IConfiguration configuration, List<string> errors, ILogger? logger)
     {
         var metadataPath = configuration["Honua:MetadataPath"] ?? configuration["MetadataPath"];
         if (metadataPath.IsNullOrWhiteSpace())
@@ -202,9 +204,10 @@ public static class ConfigurationValidator
             if (!System.IO.Directory.Exists(metadataPath) && !System.IO.File.Exists(metadataPath))
             {
                 // Don't fail - it might be a relative path that will be resolved later
-                System.Diagnostics.Debug.WriteLine(
-                    $"Warning: Configured metadata path '{metadataPath}' does not exist at startup. " +
-                    "It will be resolved relative to content root.");
+                logger?.LogWarning(
+                    "Configured metadata path '{MetadataPath}' does not exist at startup. " +
+                    "It will be resolved relative to content root",
+                    metadataPath);
             }
         }
     }

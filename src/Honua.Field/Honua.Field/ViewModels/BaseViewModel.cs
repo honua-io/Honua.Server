@@ -3,6 +3,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 
 namespace HonuaField.ViewModels;
 
@@ -49,8 +50,8 @@ public abstract partial class BaseViewModel : ObservableObject
 		ErrorMessage = message;
 
 		// Log the error
-		System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
-		System.Diagnostics.Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+		_logger.LogError(ex, "Error");
+		
 
 		// Show error to user
 		await ShowAlertAsync("Error", $"{message}: {ex.Message}");
