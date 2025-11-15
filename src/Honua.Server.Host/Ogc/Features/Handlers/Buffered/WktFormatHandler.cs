@@ -51,9 +51,9 @@ public sealed class WktFormatHandler : BufferedFormatHandlerBase
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.Wkt"/>.
+    /// Returns <see cref="OgcResponseFormat.Wkt"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.Wkt;
+    public override OgcResponseFormat Format => OgcResponseFormat.Wkt;
 
     /// <inheritdoc/>
     /// <remarks>

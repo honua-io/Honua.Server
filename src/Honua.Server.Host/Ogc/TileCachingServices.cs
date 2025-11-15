@@ -2,6 +2,8 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using Honua.Server.Core.Raster;
+using Honua.Server.Core.Raster.Caching;
+using Honua.Server.Host.Raster;
 using Honua.Server.Host.Services;
 
 namespace Honua.Server.Host.Ogc;

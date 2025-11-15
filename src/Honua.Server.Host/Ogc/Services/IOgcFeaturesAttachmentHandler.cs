@@ -15,7 +15,7 @@ namespace Honua.Server.Host.Ogc.Services;
 /// Service for handling OGC API Features attachment operations.
 /// Provides attachment link generation and validation for features.
 /// </summary>
-internal interface IOgcFeaturesAttachmentHandler
+public interface IOgcFeaturesAttachmentHandler
 {
     /// <summary>
     /// Determines whether attachment links should be exposed for a given service and layer.

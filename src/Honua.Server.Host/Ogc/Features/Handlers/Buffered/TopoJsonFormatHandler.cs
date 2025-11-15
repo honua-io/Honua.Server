@@ -59,9 +59,9 @@ public sealed class TopoJsonFormatHandler : Crs84RequiredFormatHandlerBase
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.TopoJson"/>.
+    /// Returns <see cref="OgcResponseFormat.TopoJson"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.TopoJson;
+    public override OgcResponseFormat Format => OgcResponseFormat.TopoJson;
 
     /// <inheritdoc/>
     /// <remarks>

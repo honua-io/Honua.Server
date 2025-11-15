@@ -3,6 +3,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Data;
 using Honua.Server.Core.Raster.Export;
 using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Utilities;
@@ -53,7 +54,7 @@ public sealed class GeoArrowFormatHandler : ExportFormatHandlerBase
     }
 
     /// <inheritdoc/>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.GeoArrow;
+    public override OgcResponseFormat Format => OgcResponseFormat.GeoArrow;
 
     /// <inheritdoc/>
     protected override string GetFormatDisplayName() => "GeoArrow";
@@ -77,7 +78,7 @@ public sealed class GeoArrowFormatHandler : ExportFormatHandlerBase
 
         // Line 251 from OgcFeaturesHandlers.Items.cs:
         // Determine effective CRS - use default CRS84 if not specified
-        var effectiveCrs = request.ContentCrs.IsNullOrWhiteSpace() ? CrsHelper.DefaultCrsIdentifier : request.ContentCrs;
+        var effectiveCrs = string.IsNullOrWhiteSpace(request.ContentCrs) ? CrsHelper.DefaultCrsIdentifier : request.ContentCrs;
 
         // Lines 252-257 from OgcFeaturesHandlers.Items.cs:
         // Export GeoArrow using the exporter service

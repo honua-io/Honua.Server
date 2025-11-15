@@ -56,9 +56,9 @@ public sealed class GeoJsonTFormatHandler : BufferedFormatHandlerBase
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.GeoJsonT"/>.
+    /// Returns <see cref="OgcResponseFormat.GeoJsonT"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.GeoJsonT;
+    public override OgcResponseFormat Format => OgcResponseFormat.GeoJsonT;
 
     /// <inheritdoc/>
     /// <remarks>

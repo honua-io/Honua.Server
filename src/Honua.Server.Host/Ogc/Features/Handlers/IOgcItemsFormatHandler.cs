@@ -21,7 +21,7 @@ public interface IOgcItemsFormatHandler
     /// <summary>
     /// Gets the output format this handler supports.
     /// </summary>
-    OgcSharedHandlers.OgcResponseFormat Format { get; }
+    OgcResponseFormat Format { get; }
 
     /// <summary>
     /// Validates whether this handler can process the given request parameters.

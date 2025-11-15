@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Serialization;
 using Honua.Server.Core.Utilities;
+using Honua.Server.Host.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -54,9 +55,9 @@ public sealed class JsonLdFormatHandler : BufferedFormatHandlerBase
 {
     /// <inheritdoc/>
     /// <remarks>
-    /// Returns <see cref="OgcSharedHandlers.OgcResponseFormat.JsonLd"/>.
+    /// Returns <see cref="OgcResponseFormat.JsonLd"/>.
     /// </remarks>
-    public override OgcSharedHandlers.OgcResponseFormat Format => OgcSharedHandlers.OgcResponseFormat.JsonLd;
+    public override OgcResponseFormat Format => OgcResponseFormat.JsonLd;
 
     /// <inheritdoc/>
     /// <remarks>

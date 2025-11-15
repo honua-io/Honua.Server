@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Honua.Server.Core.Data;
 using Honua.Server.Core.Utilities;
 
 namespace Honua.Server.Host.Ogc.Features.Handlers;
@@ -18,14 +19,14 @@ public interface IOgcFormatHandlerRegistry
     /// </summary>
     /// <param name="format">The OGC response format to get a handler for.</param>
     /// <returns>The handler for the format, or null if not registered.</returns>
-    IOgcItemsFormatHandler? GetHandler(OgcSharedHandlers.OgcResponseFormat format);
+    IOgcItemsFormatHandler? GetHandler(OgcResponseFormat format);
 
     /// <summary>
     /// Determines whether a handler is registered for the specified format.
     /// </summary>
     /// <param name="format">The OGC response format to check.</param>
     /// <returns>True if a handler is registered; false otherwise.</returns>
-    bool IsSupported(OgcSharedHandlers.OgcResponseFormat format);
+    bool IsSupported(OgcResponseFormat format);
 
     /// <summary>
     /// Gets all registered format handlers.
@@ -37,7 +38,7 @@ public interface IOgcFormatHandlerRegistry
     /// Gets all supported formats.
     /// </summary>
     /// <returns>A read-only list of all supported formats.</returns>
-    IReadOnlyList<OgcSharedHandlers.OgcResponseFormat> GetSupportedFormats();
+    IReadOnlyList<OgcResponseFormat> GetSupportedFormats();
 }
 
 /// <summary>
@@ -46,7 +47,7 @@ public interface IOgcFormatHandlerRegistry
 /// </summary>
 public sealed class OgcFormatHandlerRegistry : IOgcFormatHandlerRegistry
 {
-    private readonly IReadOnlyDictionary<OgcSharedHandlers.OgcResponseFormat, IOgcItemsFormatHandler> handlers;
+    private readonly IReadOnlyDictionary<OgcResponseFormat, IOgcItemsFormatHandler> handlers;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OgcFormatHandlerRegistry"/> class.
@@ -63,7 +64,7 @@ public sealed class OgcFormatHandlerRegistry : IOgcFormatHandlerRegistry
     {
         Guard.NotNull(handlers);
 
-        var handlerMap = new Dictionary<OgcSharedHandlers.OgcResponseFormat, IOgcItemsFormatHandler>();
+        var handlerMap = new Dictionary<OgcResponseFormat, IOgcItemsFormatHandler>();
 
         foreach (var handler in handlers)
         {
@@ -86,13 +87,13 @@ public sealed class OgcFormatHandlerRegistry : IOgcFormatHandlerRegistry
     }
 
     /// <inheritdoc/>
-    public IOgcItemsFormatHandler? GetHandler(OgcSharedHandlers.OgcResponseFormat format)
+    public IOgcItemsFormatHandler? GetHandler(OgcResponseFormat format)
     {
         return this.handlers.TryGetValue(format, out var handler) ? handler : null;
     }
 
     /// <inheritdoc/>
-    public bool IsSupported(OgcSharedHandlers.OgcResponseFormat format)
+    public bool IsSupported(OgcResponseFormat format)
     {
         return this.handlers.ContainsKey(format);
     }
@@ -104,7 +105,7 @@ public sealed class OgcFormatHandlerRegistry : IOgcFormatHandlerRegistry
     }
 
     /// <inheritdoc/>
-    public IReadOnlyList<OgcSharedHandlers.OgcResponseFormat> GetSupportedFormats()
+    public IReadOnlyList<OgcResponseFormat> GetSupportedFormats()
     {
         return this.handlers.Keys.ToList();
     }
@@ -137,7 +138,7 @@ public static class OgcFormatHandlerRegistryExtensions
     /// </exception>
     public static IOgcItemsFormatHandler GetRequiredHandler(
         this IOgcFormatHandlerRegistry registry,
-        OgcSharedHandlers.OgcResponseFormat format)
+        OgcResponseFormat format)
     {
         Guard.NotNull(registry);
 
@@ -169,8 +170,8 @@ public static class OgcFormatHandlerRegistryExtensions
     /// <returns>True if a valid handler was found; false otherwise.</returns>
     public static bool TryGetValidatedHandler(
         this IOgcFormatHandlerRegistry registry,
-        OgcSharedHandlers.OgcResponseFormat format,
-        Core.Query.FeatureQuery query,
+        OgcResponseFormat format,
+        FeatureQuery query,
         string? requestedCrs,
         FormatContext context,
         out IOgcItemsFormatHandler? handler,

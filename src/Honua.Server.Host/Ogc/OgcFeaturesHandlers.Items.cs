@@ -178,11 +178,11 @@ internal static partial class OgcFeaturesHandlers
 
         var requestedCrsSource = queryOverrides ?? request.Query;
         var requestedCrs = requestedCrsSource["crs"].ToString();
-        var isKmlLike = format is OgcSharedHandlers.OgcResponseFormat.Kml or OgcSharedHandlers.OgcResponseFormat.Kmz;
-        var isTopo = format == OgcSharedHandlers.OgcResponseFormat.TopoJson;
-        var isHtml = format == OgcSharedHandlers.OgcResponseFormat.Html;
-        var isWkt = format == OgcSharedHandlers.OgcResponseFormat.Wkt;
-        var isWkb = format == OgcSharedHandlers.OgcResponseFormat.Wkb;
+        var isKmlLike = format is OgcResponseFormat.Kml or OgcResponseFormat.Kmz;
+        var isTopo = format == OgcResponseFormat.TopoJson;
+        var isHtml = format == OgcResponseFormat.Html;
+        var isWkt = format == OgcResponseFormat.Wkt;
+        var isWkb = format == OgcResponseFormat.Wkb;
         StyleDefinition? kmlStyle = null;
 
         if (isKmlLike || isTopo)
@@ -209,7 +209,7 @@ internal static partial class OgcFeaturesHandlers
                 kmlStyle = await OgcSharedHandlers.ResolveStyleDefinitionAsync(preferredStyleId!, layer, metadataRegistry, cancellationToken).ConfigureAwait(false);
             }
         }
-        else if (format == OgcSharedHandlers.OgcResponseFormat.GeoPackage)
+        else if (format == OgcResponseFormat.GeoPackage)
         {
             if (query.ResultType == FeatureResultType.Hits)
             {
@@ -226,7 +226,7 @@ internal static partial class OgcFeaturesHandlers
             return Results.File(exportResult.Content, OgcSharedHandlers.GetMimeType(format), exportResult.FileName)
                 .WithFeatureCacheHeaders(cacheHeaderService);
         }
-        else if (format == OgcSharedHandlers.OgcResponseFormat.Shapefile)
+        else if (format == OgcResponseFormat.Shapefile)
         {
             if (query.ResultType == FeatureResultType.Hits)
             {
@@ -243,7 +243,7 @@ internal static partial class OgcFeaturesHandlers
             return Results.File(shapefileResult.Content, OgcSharedHandlers.GetMimeType(format), shapefileResult.FileName)
                 .WithFeatureCacheHeaders(cacheHeaderService);
         }
-        else if (format == OgcSharedHandlers.OgcResponseFormat.FlatGeobuf)
+        else if (format == OgcResponseFormat.FlatGeobuf)
         {
             if (query.ResultType == FeatureResultType.Hits)
             {
@@ -261,7 +261,7 @@ internal static partial class OgcFeaturesHandlers
             return Results.File(exportResult.Content, OgcSharedHandlers.GetMimeType(format), exportResult.FileName)
                 .WithFeatureCacheHeaders(cacheHeaderService);
         }
-        else if (format == OgcSharedHandlers.OgcResponseFormat.GeoArrow)
+        else if (format == OgcResponseFormat.GeoArrow)
         {
             if (query.ResultType == FeatureResultType.Hits)
             {
@@ -279,7 +279,7 @@ internal static partial class OgcFeaturesHandlers
             return Results.File(exportResult.Content, OgcSharedHandlers.GetMimeType(format), exportResult.FileName)
                 .WithFeatureCacheHeaders(cacheHeaderService);
         }
-        else if (format == OgcSharedHandlers.OgcResponseFormat.Csv)
+        else if (format == OgcResponseFormat.Csv)
         {
             if (query.ResultType == FeatureResultType.Hits)
             {
@@ -305,7 +305,7 @@ internal static partial class OgcFeaturesHandlers
 
         var exposeAttachments = !isKmlLike && !isTopo && !isWkt && !isWkb && attachmentHandler.ShouldExposeAttachmentLinks(service, layer);
 
-        var useStreaming = format == OgcSharedHandlers.OgcResponseFormat.GeoJson
+        var useStreaming = format == OgcResponseFormat.GeoJson
             && !exposeAttachments
             && !isHtml
             && !isKmlLike
@@ -554,7 +554,7 @@ internal static partial class OgcFeaturesHandlers
                     numberReturned,
                     kmlStyle);
 
-                if (format == OgcSharedHandlers.OgcResponseFormat.Kmz)
+                if (format == OgcResponseFormat.Kmz)
                 {
                     var entryName = FileNameHelper.BuildArchiveEntryName(collectionId, null);
                     var archive = KmzArchiveBuilder.CreateArchive(payload, entryName);
@@ -666,7 +666,7 @@ internal static partial class OgcFeaturesHandlers
             return htmlResult.WithFeatureCacheHeaders(cacheHeaderService, etag);
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.JsonLd)
+        if (format == OgcResponseFormat.JsonLd)
         {
             // BUG FIX #11: JSON-LD exporter ignores proxy-aware base URL
             // Use RequestLinkHelper to produce base URL with proper scheme/host/path normalization
@@ -687,7 +687,7 @@ internal static partial class OgcFeaturesHandlers
             return jsonLdResult.WithFeatureCacheHeaders(cacheHeaderService, etag);
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.GeoJsonT)
+        if (format == OgcResponseFormat.GeoJsonT)
         {
             var geoJsonT = GeoJsonTFeatureFormatter.ToGeoJsonTFeatureCollection(
                 features!,
@@ -764,9 +764,9 @@ internal static partial class OgcFeaturesHandlers
             return formatError;
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.GeoPackage || format == OgcSharedHandlers.OgcResponseFormat.Shapefile)
+        if (format == OgcResponseFormat.GeoPackage || format == OgcResponseFormat.Shapefile)
         {
-            var label = format == OgcSharedHandlers.OgcResponseFormat.GeoPackage ? "GeoPackage" : "Shapefile";
+            var label = format == OgcResponseFormat.GeoPackage ? "GeoPackage" : "Shapefile";
             return OgcSharedHandlers.CreateValidationProblem($"{label} format is only available for collection queries.", "f");
         }
 
@@ -782,9 +782,9 @@ internal static partial class OgcFeaturesHandlers
         {
             requestedCrsRaw = acceptCrs;
         }
-        var isKmlLike = format is OgcSharedHandlers.OgcResponseFormat.Kml or OgcSharedHandlers.OgcResponseFormat.Kmz;
-        var isTopo = format == OgcSharedHandlers.OgcResponseFormat.TopoJson;
-        var isHtml = format == OgcSharedHandlers.OgcResponseFormat.Html;
+        var isKmlLike = format is OgcResponseFormat.Kml or OgcResponseFormat.Kmz;
+        var isTopo = format == OgcResponseFormat.TopoJson;
+        var isHtml = format == OgcResponseFormat.Html;
         string contentCrs;
         StyleDefinition? kmlStyle = null;
 
@@ -850,7 +850,7 @@ internal static partial class OgcFeaturesHandlers
                 var content = FeatureComponentBuilder.CreateKmlContent(layer, record, featureQuery);
                 var payload = KmlFeatureFormatter.WriteSingleFeature(collectionId, layer, content, kmlStyle);
 
-                if (format == OgcSharedHandlers.OgcResponseFormat.Kmz)
+                if (format == OgcResponseFormat.Kmz)
                 {
                     var entryName = FileNameHelper.BuildArchiveEntryName(collectionId, featureId);
                     var archive = KmzArchiveBuilder.CreateArchive(payload, entryName);
@@ -939,7 +939,7 @@ internal static partial class OgcFeaturesHandlers
             return htmlResult.WithFeatureCacheHeaders(cacheHeaderService, etag);
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.JsonLd)
+        if (format == OgcResponseFormat.JsonLd)
         {
             // BUG FIX #11: JSON-LD exporter ignores proxy-aware base URL
             // Use RequestLinkHelper to produce base URL with proper scheme/host/path normalization
@@ -951,7 +951,7 @@ internal static partial class OgcFeaturesHandlers
             return jsonLdResult.WithFeatureCacheHeaders(cacheHeaderService, etag);
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.GeoJsonT)
+        if (format == OgcResponseFormat.GeoJsonT)
         {
             var geoJsonT = GeoJsonTFeatureFormatter.ToGeoJsonTFeature(
                 feature,
@@ -1317,8 +1317,8 @@ internal static partial class OgcFeaturesHandlers
         }
 
         // For simplicity, we only support GeoJSON format for layer groups initially
-        if (format != OgcSharedHandlers.OgcResponseFormat.GeoJson &&
-            format != OgcSharedHandlers.OgcResponseFormat.Html)
+        if (format != OgcResponseFormat.GeoJson &&
+            format != OgcResponseFormat.Html)
         {
             return OgcSharedHandlers.CreateValidationProblem(
                 "Layer groups currently only support GeoJSON and HTML output formats.",
@@ -1433,7 +1433,7 @@ internal static partial class OgcFeaturesHandlers
             links.Add(OgcSharedHandlers.BuildLink(request, prevHref, "prev", "application/geo+json", "Previous page"));
         }
 
-        if (format == OgcSharedHandlers.OgcResponseFormat.Html)
+        if (format == OgcResponseFormat.Html)
         {
             var htmlComponents = new List<FeatureComponents>();
             foreach (var feature in paginatedFeatures)

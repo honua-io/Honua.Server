@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
 using Honua.Server.Core.Export;
+using Honua.Server.Core.Raster.Export;
 
 namespace Honua.Server.Host.Ogc.ParameterObjects;
 

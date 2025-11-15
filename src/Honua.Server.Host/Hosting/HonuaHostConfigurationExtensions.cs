@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿// using Honua.Server.Core.GitOps; // TODO: GitOps feature not yet implemented
 using Honua.Server.Core.Extensions;
+using Honua.Server.Core.Security;
 
 // Enterprise features disabled
 // using Honua.Server.Enterprise.ETL;

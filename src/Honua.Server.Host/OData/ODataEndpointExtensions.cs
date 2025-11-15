@@ -23,7 +23,8 @@ public static class ODataEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapODataEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var logger = endpoints.ServiceProvider.GetService<ILogger<FeatureLayerODataHandlers>>();
+        var loggerFactory = endpoints.ServiceProvider.GetService<ILoggerFactory>();
+        var logger = loggerFactory?.CreateLogger("Honua.Server.Host.OData");
 
         logger?.LogDebug("Registering OData v4 endpoints");
 

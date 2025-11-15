@@ -15,8 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Exclude Enterprise-dependent files -->
+    <!-- Exclude Enterprise-dependent files and marketplace services requiring unavailable packages -->
     <Compile Remove="Licensing\CredentialRevocationService.cs" />
+    <Compile Remove="Marketplace\**\*.cs" />
   </ItemGroup>
 
   <ItemGroup>

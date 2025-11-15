@@ -55,8 +55,8 @@ public static class ServiceCollectionExtensions
         services.AddProblemDetails();
 
         // Register security headers options with validation
-        services.AddOptions<SecurityHeadersOptions>()
-            .Bind(configuration.GetSection(SecurityHeadersOptions.SectionName))
+        services.AddOptions<Host.Configuration.SecurityHeadersOptions>()
+            .Bind(configuration.GetSection(Host.Configuration.SecurityHeadersOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
