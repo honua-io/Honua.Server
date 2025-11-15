@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Asp.Versioning;
 using Honua.MapSDK.Models;
 using Honua.Server.Core.Maps.AI;
 using Microsoft.AspNetCore.Authorization;
@@ -24,7 +25,8 @@ namespace Honua.Server.Host.API;
 /// </remarks>
 /*
 [ApiController]
-[Route("api/maps/ai")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/maps/ai")]
 [Produces("application/json")]
 [Tags("AI Map Generation")]
 public class MapsAiController : ControllerBase

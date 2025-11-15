@@ -1,0 +1,265 @@
+{
+  "patterns": [
+    {
+      "name": "Route Deviation Detection",
+      "description": "Detect when a vehicle enters an unauthorized zone within 30 minutes of leaving a designated area",
+      "patternType": "sequence",
+      "windowDurationSeconds": 1800,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "conditionId": "step1",
+          "eventType": "exit",
+          "geofenceNamePattern": "Warehouse-.*",
+          "expected": true
+        },
+        {
+          "conditionId": "step2",
+          "eventType": "enter",
+          "geofenceNamePattern": "Unauthorized-.*",
+          "previousConditionId": "step1",
+          "maxTimeSincePreviousSeconds": 1800,
+          "expected": true
+        }
+      ],
+      "alertName": "Route Deviation Detected",
+      "alertSeverity": "critical",
+      "alertDescription": "Vehicle {entity_id} entered unauthorized zone {geofence_name} after leaving warehouse",
+      "alertLabels": {
+        "category": "compliance",
+        "subcategory": "route-deviation"
+      },
+      "priority": 10
+    },
+    {
+      "name": "Loitering Detection",
+      "description": "Detect when an entity enters/exits the same geofence 3+ times within 1 hour",
+      "patternType": "count",
+      "windowDurationSeconds": 3600,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "eventType": "exit",
+          "minOccurrences": 3
+        }
+      ],
+      "alertName": "Loitering Detected",
+      "alertSeverity": "medium",
+      "alertDescription": "Entity {entity_id} has entered/exited {geofence_name} {count} times in 1 hour",
+      "alertLabels": {
+        "category": "security",
+        "subcategory": "loitering"
+      },
+      "priority": 5
+    },
+    {
+      "name": "Convoy Detection",
+      "description": "Detect when 3+ vehicles enter the same geofence within 5 minutes",
+      "patternType": "correlation",
+      "windowDurationSeconds": 300,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "eventType": "enter",
+          "minOccurrences": 3,
+          "uniqueEntities": true
+        }
+      ],
+      "alertName": "Convoy Detected",
+      "alertSeverity": "info",
+      "alertDescription": "{entity_count} vehicles entered {geofence_name} within 5 minutes",
+      "alertLabels": {
+        "category": "monitoring",
+        "subcategory": "convoy"
+      },
+      "priority": 3
+    },
+    {
+      "name": "Missed Checkpoint",
+      "description": "Detect when a vehicle leaves checkpoint A but doesn't reach checkpoint B within 2 hours",
+      "patternType": "absence",
+      "windowDurationSeconds": 7200,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "conditionId": "step1",
+          "eventType": "exit",
+          "geofenceNamePattern": "Checkpoint-A",
+          "expected": true
+        },
+        {
+          "conditionId": "step2",
+          "eventType": "enter",
+          "geofenceNamePattern": "Checkpoint-B",
+          "expected": false,
+          "maxTimeSincePreviousSeconds": 7200
+        }
+      ],
+      "alertName": "Missed Checkpoint",
+      "alertSeverity": "warning",
+      "alertDescription": "Vehicle {entity_id} left Checkpoint A but did not reach Checkpoint B within 2 hours",
+      "alertLabels": {
+        "category": "logistics",
+        "subcategory": "route-compliance"
+      },
+      "priority": 7
+    },
+    {
+      "name": "Extended Loading Time",
+      "description": "Detect when a vehicle dwells in loading dock for more than 2 hours",
+      "patternType": "count",
+      "windowDurationSeconds": 7200,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "eventType": "exit",
+          "geofenceNamePattern": "Loading-Dock-.*",
+          "minDwellTimeSeconds": 7200,
+          "minOccurrences": 1
+        }
+      ],
+      "alertName": "Extended Loading Time",
+      "alertSeverity": "medium",
+      "alertDescription": "Vehicle {entity_id} has been in loading dock {geofence_name} for {dwell_time_minutes} minutes",
+      "alertLabels": {
+        "category": "operations",
+        "subcategory": "loading-efficiency"
+      },
+      "priority": 5
+    },
+    {
+      "name": "After Hours Access",
+      "description": "Detect access to restricted areas outside business hours",
+      "patternType": "sequence",
+      "windowDurationSeconds": 28800,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "eventType": "enter",
+          "geofenceNamePattern": "Restricted-.*",
+          "expected": true
+        }
+      ],
+      "alertName": "After Hours Access Detected",
+      "alertSeverity": "high",
+      "alertDescription": "Entity {entity_id} accessed restricted area {geofence_name} outside business hours",
+      "alertLabels": {
+        "category": "security",
+        "subcategory": "after-hours-access"
+      },
+      "priority": 9
+    },
+    {
+      "name": "Rapid Zone Cycling",
+      "description": "Detect unusual behavior: entity cycles between zones rapidly",
+      "patternType": "count",
+      "windowDurationSeconds": 1800,
+      "windowType": "tumbling",
+      "conditions": [
+        {
+          "eventType": "enter",
+          "minOccurrences": 5
+        }
+      ],
+      "alertName": "Rapid Zone Cycling Detected",
+      "alertSeverity": "medium",
+      "alertDescription": "Entity {entity_id} entered multiple zones {count} times in 30 minutes",
+      "alertLabels": {
+        "category": "anomaly",
+        "subcategory": "rapid-movement"
+      },
+      "priority": 4
+    },
+    {
+      "name": "Tailgating Detection",
+      "description": "Detect multiple people entering secure area within 30 seconds",
+      "patternType": "correlation",
+      "windowDurationSeconds": 30,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "eventType": "enter",
+          "geofenceNamePattern": "Secure-.*",
+          "entityType": "person",
+          "minOccurrences": 2,
+          "uniqueEntities": true
+        }
+      ],
+      "alertName": "Potential Tailgating Detected",
+      "alertSeverity": "high",
+      "alertDescription": "{entity_count} people entered secure area {geofence_name} within 30 seconds",
+      "alertLabels": {
+        "category": "security",
+        "subcategory": "tailgating"
+      },
+      "priority": 8
+    },
+    {
+      "name": "Delivery Route Completion",
+      "description": "Track delivery route completion: warehouse -> customer -> warehouse",
+      "patternType": "sequence",
+      "windowDurationSeconds": 14400,
+      "windowType": "sliding",
+      "conditions": [
+        {
+          "conditionId": "step1",
+          "eventType": "exit",
+          "geofenceNamePattern": "Warehouse-.*"
+        },
+        {
+          "conditionId": "step2",
+          "eventType": "enter",
+          "geofenceNamePattern": "Customer-.*",
+          "previousConditionId": "step1",
+          "maxTimeSincePreviousSeconds": 7200
+        },
+        {
+          "conditionId": "step3",
+          "eventType": "exit",
+          "geofenceNamePattern": "Customer-.*",
+          "previousConditionId": "step2",
+          "minDwellTimeSeconds": 300,
+          "maxTimeSincePreviousSeconds": 3600
+        },
+        {
+          "conditionId": "step4",
+          "eventType": "enter",
+          "geofenceNamePattern": "Warehouse-.*",
+          "previousConditionId": "step3",
+          "maxTimeSincePreviousSeconds": 7200
+        }
+      ],
+      "alertName": "Delivery Route Completed",
+      "alertSeverity": "info",
+      "alertDescription": "Vehicle {entity_id} completed delivery route successfully",
+      "alertLabels": {
+        "category": "operations",
+        "subcategory": "delivery-completion"
+      },
+      "priority": 2
+    },
+    {
+      "name": "Fleet Gathering",
+      "description": "Detect when 5+ vehicles from same fleet gather at location",
+      "patternType": "correlation",
+      "windowDurationSeconds": 600,
+      "windowType": "tumbling",
+      "conditions": [
+        {
+          "eventType": "enter",
+          "entityIdPattern": "fleet-A-.*",
+          "minOccurrences": 5,
+          "uniqueEntities": true
+        }
+      ],
+      "alertName": "Fleet Gathering Detected",
+      "alertSeverity": "info",
+      "alertDescription": "{entity_count} vehicles from fleet gathered at {geofence_name}",
+      "alertLabels": {
+        "category": "monitoring",
+        "subcategory": "fleet-gathering"
+      },
+      "priority": 3
+    }
+  ]
+}

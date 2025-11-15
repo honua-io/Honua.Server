@@ -144,6 +144,20 @@ public sealed class PostgresPoolOptions
     public int MaxPoolSize { get; set; } = 50;
 
     /// <summary>
+    /// Enable automatic pool size scaling based on CPU core count.
+    /// When enabled, MaxPoolSize is calculated as: ProcessorCount * ScaleFactor
+    /// Default: false (use explicit MaxPoolSize)
+    /// </summary>
+    public bool AutoScale { get; set; } = false;
+
+    /// <summary>
+    /// Connections per CPU core when auto-scaling is enabled.
+    /// Typical values: 10-20 for web servers, 5-10 for background workers
+    /// Default: 15
+    /// </summary>
+    public int ScaleFactor { get; set; } = 15;
+
+    /// <summary>
     /// Connection lifetime in seconds.
     /// Default: 600 (10 minutes)
     /// </summary>
@@ -160,6 +174,23 @@ public sealed class PostgresPoolOptions
     /// Default: "Honua.Server"
     /// </summary>
     public string ApplicationName { get; set; } = "Honua.Server";
+
+    /// <summary>
+    /// Get effective maximum pool size considering auto-scaling configuration.
+    /// </summary>
+    public int GetEffectiveMaxSize()
+    {
+        if (!AutoScale)
+        {
+            return MaxPoolSize;
+        }
+
+        var cpuCount = Environment.ProcessorCount;
+        var scaledSize = cpuCount * ScaleFactor;
+
+        // Ensure we stay within reasonable bounds
+        return Math.Max(10, Math.Min(scaledSize, 500));
+    }
 }
 
 /// <summary>

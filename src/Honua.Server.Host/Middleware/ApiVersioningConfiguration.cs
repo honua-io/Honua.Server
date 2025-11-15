@@ -5,13 +5,18 @@ namespace Honua.Server.Host.Middleware;
 /// <summary>
 /// Configuration for API versioning to support multiple API versions and graceful deprecation.
 /// Note: API versioning can be added by installing Asp.Versioning.Mvc package.
-/// Implements URL path versioning (e.g., /v1/collections, /v2/collections).
+/// Implements both URL path versioning and query parameter versioning per Microsoft Azure REST API Guidelines.
+/// Supports: URL path (e.g., /api/v1.0/collections) and query parameter (e.g., /api/collections?api-version=1.0).
 /// </summary>
 public static class ApiVersioningConfiguration
 {
     /// <summary>
     /// Configuration for API versioning to support multiple API versions and graceful deprecation.
-    /// Implements URL path versioning (e.g., /v1/collections, /v2/collections).
+    /// Implements both URL path versioning and query parameter versioning for maximum flexibility.
+    /// Clients can specify version via:
+    /// - URL path: /api/v1.0/collections (recommended for new APIs)
+    /// - Query parameter: /api/collections?api-version=1.0 (Azure REST API Guidelines compliance)
+    /// - Both methods can be used simultaneously (redundant but valid)
     /// </summary>
     public static IServiceCollection AddHonuaApiVersioning(this IServiceCollection services)
     {
@@ -26,8 +31,12 @@ public static class ApiVersioningConfiguration
             // Report API versions in response headers
             options.ReportApiVersions = true;
 
-            // Read version from URL path
-            options.ApiVersionReader = new Asp.Versioning.UrlSegmentApiVersionReader();
+            // Read version from both URL path and query parameter for Azure REST API Guidelines compliance
+            // Supports: /api/v1.0/maps AND /api/maps?api-version=1.0
+            options.ApiVersionReader = Asp.Versioning.ApiVersionReader.Combine(
+                new Asp.Versioning.UrlSegmentApiVersionReader(),
+                new Asp.Versioning.QueryStringApiVersionReader("api-version")
+            );
         })
         .AddMvc()
         .AddApiExplorer(options =>

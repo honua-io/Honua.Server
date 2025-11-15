@@ -191,6 +191,12 @@ public static class ServiceCollectionExtensions
         services.AddKeyedSingleton<IDataStoreProvider>(SqlServerDataStoreProvider.ProviderKey, (_, _) => new SqlServerDataStoreProvider());
         services.AddKeyedSingleton<IDataStoreProvider>(MySqlDataStoreProvider.ProviderKey, (_, _) => new MySqlDataStoreProvider());
 
+        // Read replica routing support (opt-in via configuration)
+        services.Configure<ReadReplicaOptions>(configuration.GetSection("ReadReplica"));
+        services.AddSingleton<ReadReplicaMetrics>();
+        services.AddSingleton<IDataSourceRouter, ReadReplicaRouter>();
+        services.AddHostedService<ReadReplicaInitializationService>();
+
         // IFeatureRepository is stateless and safe as Singleton
         // It resolves feature context per operation and doesn't hold request-specific state
         services.AddSingleton<IFeatureRepository, FeatureRepository>();

@@ -7,6 +7,11 @@ namespace Honua.Server.AlertReceiver.Services;
 
 public sealed class AlertPersistenceException : Exception
 {
+    public AlertPersistenceException(string message)
+        : base(message)
+    {
+    }
+
     public AlertPersistenceException(string message, Exception innerException)
         : base(message, innerException)
     {

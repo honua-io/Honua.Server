@@ -148,17 +148,20 @@ public sealed class FeatureRepository : IFeatureRepository
     private readonly ILogger<FeatureRepository> _logger;
     private readonly QueryTimeoutOptions _timeoutOptions;
     private readonly IQueryMetrics? _queryMetrics;
+    private readonly IDataSourceRouter? _dataSourceRouter;
 
     public FeatureRepository(
         IFeatureContextResolver contextResolver,
         ILogger<FeatureRepository> logger,
         IOptions<QueryTimeoutOptions> timeoutOptions,
-        IQueryMetrics? queryMetrics = null)
+        IQueryMetrics? queryMetrics = null,
+        IDataSourceRouter? dataSourceRouter = null)
     {
         _contextResolver = contextResolver ?? throw new ArgumentNullException(nameof(contextResolver));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _timeoutOptions = timeoutOptions?.Value ?? new QueryTimeoutOptions();
         _queryMetrics = queryMetrics; // Optional to maintain backward compatibility
+        _dataSourceRouter = dataSourceRouter; // Optional - null when read replica routing is disabled
     }
 
     public IAsyncEnumerable<FeatureRecord> QueryAsync(string serviceId, string layerId, FeatureQuery? query, CancellationToken cancellationToken = default)
@@ -179,7 +182,7 @@ public sealed class FeatureRepository : IFeatureRepository
             layerId,
             async (effectiveQuery, timeoutCts) =>
             {
-                var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+                var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
                 var normalizedQuery = NormalizeQuery(context, query);
 
                 // Apply timeout to query if not already specified
@@ -199,7 +202,7 @@ public sealed class FeatureRepository : IFeatureRepository
         Guard.NotNullOrWhiteSpace(serviceId);
         Guard.NotNullOrWhiteSpace(layerId);
         Guard.NotNullOrWhiteSpace(featureId);
-        var context = await ResolveContextAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+        var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, cancellationToken).ConfigureAwait(false);
         var normalizedQuery = NormalizeQuery(context, query);
         return await context.Provider.GetAsync(context.DataSource, context.Service, context.Layer, featureId, normalizedQuery, cancellationToken);
     }
@@ -302,7 +305,7 @@ public sealed class FeatureRepository : IFeatureRepository
             layerId,
             async (query, timeoutCts) =>
             {
-                var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+                var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
 
                 // Try provider's native MVT generation with temporal filter
                 var mvtBytes = await context.Provider.GenerateMvtTileAsync(
@@ -366,7 +369,7 @@ public sealed class FeatureRepository : IFeatureRepository
         var recordCount = 0L;
         var success = false;
 
-        var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+        var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
         var effectiveQuery = NormalizeQuery(context, query);
 
         // Apply timeout to query if not already specified
@@ -649,7 +652,7 @@ public sealed class FeatureRepository : IFeatureRepository
             layerId,
             async (effectiveQuery, timeoutCts) =>
             {
-                var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+                var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
                 var normalizedQuery = NormalizeQuery(context, filter);
 
                 // Apply timeout to query if not already specified
@@ -688,7 +691,7 @@ public sealed class FeatureRepository : IFeatureRepository
             layerId,
             async (effectiveQuery, timeoutCts) =>
             {
-                var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+                var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
                 var normalizedQuery = NormalizeQuery(context, filter);
 
                 // Apply timeout to query if not already specified
@@ -724,7 +727,7 @@ public sealed class FeatureRepository : IFeatureRepository
             layerId,
             async (effectiveQuery, timeoutCts) =>
             {
-                var context = await ResolveContextAsync(serviceId, layerId, timeoutCts.Token).ConfigureAwait(false);
+                var context = await ResolveContextAsync(serviceId, layerId, isReadOnly: true, timeoutCts.Token).ConfigureAwait(false);
                 var normalizedQuery = NormalizeQuery(context, filter);
 
                 // Apply timeout to query if not already specified
@@ -745,7 +748,26 @@ public sealed class FeatureRepository : IFeatureRepository
     }
 
     private Task<FeatureContext> ResolveContextAsync(string serviceId, string layerId, CancellationToken cancellationToken)
-        => _contextResolver.ResolveAsync(serviceId, layerId, cancellationToken);
+        => ResolveContextAsync(serviceId, layerId, isReadOnly: false, cancellationToken);
+
+    private async Task<FeatureContext> ResolveContextAsync(string serviceId, string layerId, bool isReadOnly, CancellationToken cancellationToken)
+    {
+        var context = await _contextResolver.ResolveAsync(serviceId, layerId, cancellationToken).ConfigureAwait(false);
+
+        // If router is available and this is a read operation, potentially route to replica
+        if (_dataSourceRouter != null && isReadOnly)
+        {
+            var routedDataSource = await _dataSourceRouter.RouteAsync(context.DataSource, isReadOnly, cancellationToken).ConfigureAwait(false);
+
+            // If a different data source was selected (replica), return new context with that data source
+            if (!ReferenceEquals(routedDataSource, context.DataSource))
+            {
+                return context with { DataSource = routedDataSource };
+            }
+        }
+
+        return context;
+    }
 
     /// <summary>
     /// Executes a query operation with configurable timeout, logging, and OpenTelemetry metrics.

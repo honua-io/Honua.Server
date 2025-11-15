@@ -19,21 +19,21 @@ namespace Honua.Server.Enterprise.Sensors.Data.Postgres;
 /// </summary>
 public sealed partial class PostgresSensorThingsRepository : ISensorThingsRepository
 {
-    private readonly IDbConnection _connection;
+    private readonly ISensorThingsDbConnectionFactory _connectionFactory;
     private readonly SensorThingsServiceDefinition _config;
     private readonly ILogger<PostgresSensorThingsRepository> _logger;
     private readonly GeoJsonReader _geoJsonReader;
     private readonly GeoJsonWriter _geoJsonWriter;
 
     public PostgresSensorThingsRepository(
-        IDbConnection connection,
+        ISensorThingsDbConnectionFactory connectionFactory,
         SensorThingsServiceDefinition config,
         ILogger<PostgresSensorThingsRepository> logger)
     {
         DapperBootstrapper.EnsureConfigured();
-        _connection = connection;
-        _config = config;
-        _logger = logger;
+        _connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _geoJsonReader = new GeoJsonReader();
         _geoJsonWriter = new GeoJsonWriter();
     }

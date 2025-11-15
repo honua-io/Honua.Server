@@ -78,6 +78,26 @@ public interface IControlPlane
     /// <returns>Process run if available, null if queue is empty</returns>
     Task<ProcessRun?> DequeueNextJobAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Updates the progress of a running job
+    /// </summary>
+    /// <param name="jobId">Job ID</param>
+    /// <param name="progressPercent">Progress percentage (0-100)</param>
+    /// <param name="progressMessage">Optional progress message</param>
+    /// <param name="ct">Cancellation token</param>
+    Task UpdateJobProgressAsync(string jobId, int progressPercent, string? progressMessage = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Requeues a job for retry after a transient failure
+    /// Increments retry count and resets status to pending
+    /// </summary>
+    /// <param name="jobId">Job ID to requeue</param>
+    /// <param name="retryCount">Current retry count</param>
+    /// <param name="errorMessage">Error message from the failed attempt</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>True if requeued successfully, false if job not found</returns>
+    Task<bool> RequeueJobForRetryAsync(string jobId, int retryCount, string errorMessage, CancellationToken ct = default);
+
     // ==================== AUDITING ====================
     // Provenance, cost tracking, telemetry
 

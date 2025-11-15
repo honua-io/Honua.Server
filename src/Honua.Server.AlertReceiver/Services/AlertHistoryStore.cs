@@ -5,6 +5,7 @@
 
 using System.Data;
 using System.Linq;
+using System.Text.Json;
 using Dapper;
 using Honua.Server.AlertReceiver.Data;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,14 @@ public interface IAlertHistoryStore
     Task<IReadOnlyList<AlertHistoryEntry>> GetRecentAlertsAsync(int limit, string? severity, CancellationToken cancellationToken = default);
 
     Task<AlertHistoryEntry?> GetAlertByFingerprintAsync(string fingerprint, CancellationToken cancellationToken = default);
+
+    Task<AlertHistoryEntry?> GetAlertByIdAsync(long id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AlertHistoryEntry>> GetPendingAlertsForRetryAsync(int limit, DateTimeOffset maxRetryTime, CancellationToken cancellationToken = default);
+
+    Task UpdateAlertDeliveryStatusAsync(long id, AlertDeliveryStatus status, string[] publishedTo, string[] failedChannels, CancellationToken cancellationToken = default);
+
+    Task IncrementRetryCountAsync(long id, DateTimeOffset retryTime, CancellationToken cancellationToken = default);
 
     Task InsertAcknowledgementAsync(AlertAcknowledgement acknowledgement, CancellationToken cancellationToken = default);
 
@@ -57,11 +66,17 @@ CREATE TABLE IF NOT EXISTS alert_history (
     timestamp TIMESTAMPTZ NOT NULL,
     published_to JSONB NOT NULL,
     was_suppressed BOOLEAN NOT NULL,
-    suppression_reason TEXT NULL
+    suppression_reason TEXT NULL,
+    delivery_status TEXT NOT NULL DEFAULT 'Pending',
+    failed_channels JSONB NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_retry_attempt TIMESTAMPTZ NULL
 );
 CREATE INDEX IF NOT EXISTS idx_alert_history_fingerprint ON alert_history(fingerprint);
 CREATE INDEX IF NOT EXISTS idx_alert_history_timestamp ON alert_history(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alert_history_severity_timestamp ON alert_history(severity, timestamp);
+CREATE INDEX IF NOT EXISTS idx_alert_history_delivery_status ON alert_history(delivery_status);
+CREATE INDEX IF NOT EXISTS idx_alert_history_pending_retry ON alert_history(delivery_status, last_retry_attempt) WHERE delivery_status IN ('Pending', 'Failed', 'PartiallyFailed');
 
 CREATE TABLE IF NOT EXISTS alert_acknowledgements (
     id BIGSERIAL PRIMARY KEY,
@@ -105,7 +120,11 @@ INSERT INTO alert_history (
     timestamp,
     published_to,
     was_suppressed,
-    suppression_reason)
+    suppression_reason,
+    delivery_status,
+    failed_channels,
+    retry_count,
+    last_retry_attempt)
 VALUES (
     @Fingerprint,
     @Name,
@@ -121,7 +140,11 @@ VALUES (
     @Timestamp,
     CAST(@PublishedToJson AS jsonb),
     @WasSuppressed,
-    @SuppressionReason)
+    @SuppressionReason,
+    @DeliveryStatus,
+    CAST(@FailedChannelsJson AS jsonb),
+    @RetryCount,
+    @LastRetryAttempt)
 RETURNING id;";
 
     private const string SelectRecentAlertsSql = @"
@@ -140,7 +163,11 @@ SELECT id,
        timestamp,
        published_to AS PublishedToJson,
        was_suppressed,
-       suppression_reason
+       suppression_reason,
+       delivery_status AS DeliveryStatus,
+       failed_channels AS FailedChannelsJson,
+       retry_count,
+       last_retry_attempt
 FROM alert_history
 WHERE (@Severity IS NULL OR severity = @Severity)
 ORDER BY timestamp DESC
@@ -162,7 +189,11 @@ SELECT id,
        timestamp,
        published_to AS PublishedToJson,
        was_suppressed,
-       suppression_reason
+       suppression_reason,
+       delivery_status AS DeliveryStatus,
+       failed_channels AS FailedChannelsJson,
+       retry_count,
+       last_retry_attempt
 FROM alert_history
 WHERE fingerprint = @Fingerprint
 ORDER BY timestamp DESC
@@ -234,6 +265,71 @@ UPDATE alert_silencing_rules
 SET is_active = FALSE
 WHERE id = @RuleId;";
 
+    private const string SelectAlertByIdSql = @"
+SELECT id,
+       fingerprint,
+       name,
+       severity,
+       status,
+       summary,
+       description,
+       source,
+       service,
+       environment,
+       labels AS LabelsJson,
+       context AS ContextJson,
+       timestamp,
+       published_to AS PublishedToJson,
+       was_suppressed,
+       suppression_reason,
+       delivery_status AS DeliveryStatus,
+       failed_channels AS FailedChannelsJson,
+       retry_count,
+       last_retry_attempt
+FROM alert_history
+WHERE id = @Id;";
+
+    private const string SelectPendingAlertsForRetrySql = @"
+SELECT id,
+       fingerprint,
+       name,
+       severity,
+       status,
+       summary,
+       description,
+       source,
+       service,
+       environment,
+       labels AS LabelsJson,
+       context AS ContextJson,
+       timestamp,
+       published_to AS PublishedToJson,
+       was_suppressed,
+       suppression_reason,
+       delivery_status AS DeliveryStatus,
+       failed_channels AS FailedChannelsJson,
+       retry_count,
+       last_retry_attempt
+FROM alert_history
+WHERE delivery_status IN ('Pending', 'Failed', 'PartiallyFailed')
+  AND (last_retry_attempt IS NULL OR last_retry_attempt < @MaxRetryTime)
+  AND retry_count < 3
+ORDER BY timestamp ASC
+LIMIT @Limit;";
+
+    private const string UpdateAlertDeliveryStatusSql = @"
+UPDATE alert_history
+SET delivery_status = @DeliveryStatus,
+    published_to = CAST(@PublishedToJson AS jsonb),
+    failed_channels = CAST(@FailedChannelsJson AS jsonb)
+WHERE id = @Id;";
+
+    private const string IncrementRetryCountSql = @"
+UPDATE alert_history
+SET retry_count = retry_count + 1,
+    last_retry_attempt = @RetryTime
+WHERE id = @Id;";
+
     public AlertHistoryStore(IAlertReceiverDbConnectionFactory connectionFactory, ILogger<AlertHistoryStore> logger)
     {
         this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
@@ -265,6 +361,10 @@ WHERE id = @RuleId;";
                 record.PublishedToJson,
                 record.WasSuppressed,
                 record.SuppressionReason,
+                record.DeliveryStatus,
+                record.FailedChannelsJson,
+                record.RetryCount,
+                record.LastRetryAttempt,
             },
             cancellationToken: cancellationToken);
 
@@ -376,6 +476,62 @@ WHERE id = @RuleId;";
         var command = new CommandDefinition(
             DeactivateSilencingRuleSql,
             new { RuleId = ruleId },
+            cancellationToken: cancellationToken);
+
+        await connection.ExecuteAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task<AlertHistoryEntry?> GetAlertByIdAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var command = new CommandDefinition(
+            SelectAlertByIdSql,
+            new { Id = id },
+            cancellationToken: cancellationToken);
+
+        var record = await connection.QuerySingleOrDefaultAsync<AlertHistoryRecord>(command).ConfigureAwait(false);
+        return record is null ? null : AlertHistoryEntry.FromRecord(record);
+    }
+
+    public async Task<IReadOnlyList<AlertHistoryEntry>> GetPendingAlertsForRetryAsync(int limit, DateTimeOffset maxRetryTime, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var command = new CommandDefinition(
+            SelectPendingAlertsForRetrySql,
+            new { Limit = limit, MaxRetryTime = maxRetryTime },
+            cancellationToken: cancellationToken);
+
+        var records = await connection.QueryAsync<AlertHistoryRecord>(command).ConfigureAwait(false);
+        return records.Select(AlertHistoryEntry.FromRecord).ToList();
+    }
+
+    public async Task UpdateAlertDeliveryStatusAsync(long id, AlertDeliveryStatus status, string[] publishedTo, string[] failedChannels, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var command = new CommandDefinition(
+            UpdateAlertDeliveryStatusSql,
+            new
+            {
+                Id = id,
+                DeliveryStatus = status.ToString(),
+                PublishedToJson = publishedTo.Length > 0 ? JsonSerializer.Serialize(publishedTo) : "[]",
+                FailedChannelsJson = failedChannels.Length > 0 ? JsonSerializer.Serialize(failedChannels) : "[]",
+            },
+            cancellationToken: cancellationToken);
+
+        await connection.ExecuteAsync(command).ConfigureAwait(false);
+    }
+
+    public async Task IncrementRetryCountAsync(long id, DateTimeOffset retryTime, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await this.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+
+        var command = new CommandDefinition(
+            IncrementRetryCountSql,
+            new { Id = id, RetryTime = retryTime },
             cancellationToken: cancellationToken);
 
         await connection.ExecuteAsync(command).ConfigureAwait(false);

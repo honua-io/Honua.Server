@@ -2,6 +2,7 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Diagnostics;
 using Honua.Server.Enterprise.Events.Models;
+using Honua.Server.Enterprise.Events.Queue.Services;
 using Honua.Server.Enterprise.Events.Repositories;
 using Microsoft.Extensions.Logging;
 using NetTopologySuite.Geometries;
@@ -17,6 +18,7 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
     private readonly IEntityStateRepository _entityStateRepository;
     private readonly IGeofenceEventRepository _eventRepository;
     private readonly IGeofenceToAlertBridgeService? _alertBridgeService;
+    private readonly IDurableEventPublisher? _durableEventPublisher;
     private readonly ILogger<GeofenceEvaluationService> _logger;
 
     public GeofenceEvaluationService(
@@ -24,13 +26,15 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
         IEntityStateRepository entityStateRepository,
         IGeofenceEventRepository eventRepository,
         ILogger<GeofenceEvaluationService> logger,
-        IGeofenceToAlertBridgeService? alertBridgeService = null)
+        IGeofenceToAlertBridgeService? alertBridgeService = null,
+        IDurableEventPublisher? durableEventPublisher = null)
     {
         _geofenceRepository = geofenceRepository ?? throw new ArgumentNullException(nameof(geofenceRepository));
         _entityStateRepository = entityStateRepository ?? throw new ArgumentNullException(nameof(entityStateRepository));
         _eventRepository = eventRepository ?? throw new ArgumentNullException(nameof(eventRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _alertBridgeService = alertBridgeService; // Optional - allows gradual rollout
+        _durableEventPublisher = durableEventPublisher; // Optional - allows gradual rollout
     }
 
     public async Task<GeofenceEvaluationResult> EvaluateLocationAsync(
@@ -219,7 +223,51 @@ public class GeofenceEvaluationService : IGeofenceEvaluationService
             {
                 await _eventRepository.CreateBatchAsync(events, cancellationToken);
 
-                // 7. Process events for alert generation (if bridge service is configured)
+                // 7. Publish events to durable queue for guaranteed delivery
+                if (_durableEventPublisher != null)
+                {
+                    // Create event-geofence pairs for publishing
+                    var eventGeofencePairs = new List<(GeofenceEvent, Geofence)>();
+
+                    foreach (var geofenceEvent in events)
+                    {
+                        Geofence? eventGeofence = null;
+
+                        // Find the geofence for this event
+                        if (geofenceEvent.EventType == GeofenceEventType.Enter)
+                        {
+                            eventGeofence = enterGeofences.FirstOrDefault(g => g.Id == geofenceEvent.GeofenceId);
+                        }
+                        else if (geofenceEvent.EventType == GeofenceEventType.Exit)
+                        {
+                            eventGeofence = exitGeofenceMap.GetValueOrDefault(geofenceEvent.GeofenceId);
+                        }
+
+                        if (eventGeofence != null)
+                        {
+                            eventGeofencePairs.Add((geofenceEvent, eventGeofence));
+                        }
+                    }
+
+                    // Publish to durable queue (fire-and-forget to avoid blocking)
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _durableEventPublisher.PublishEventsAsync(
+                                eventGeofencePairs,
+                                deliveryTargets: new List<string> { "signalr" },
+                                priority: 0,
+                                CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error publishing events to durable queue");
+                        }
+                    }, CancellationToken.None);
+                }
+
+                // 8. Process events for alert generation (if bridge service is configured)
                 if (_alertBridgeService != null)
                 {
                     foreach (var geofenceEvent in events)

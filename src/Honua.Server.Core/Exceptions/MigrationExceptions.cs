@@ -9,11 +9,19 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public class MigrationException : HonuaException
 {
-    public MigrationException(string message) : base(message)
+    public MigrationException(string message) : base(message, ErrorCodes.MIGRATION_FAILED)
     {
     }
 
-    public MigrationException(string message, Exception innerException) : base(message, innerException)
+    public MigrationException(string message, Exception innerException) : base(message, ErrorCodes.MIGRATION_FAILED, innerException)
+    {
+    }
+
+    public MigrationException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public MigrationException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
     {
     }
 }
@@ -23,11 +31,11 @@ public class MigrationException : HonuaException
 /// </summary>
 public sealed class MigrationValidationException : MigrationException
 {
-    public MigrationValidationException(string message) : base(message)
+    public MigrationValidationException(string message) : base(message, ErrorCodes.MIGRATION_VALIDATION_FAILED)
     {
     }
 
-    public MigrationValidationException(string message, Exception innerException) : base(message, innerException)
+    public MigrationValidationException(string message, Exception innerException) : base(message, ErrorCodes.MIGRATION_VALIDATION_FAILED, innerException)
     {
     }
 }
@@ -39,12 +47,12 @@ public sealed class UnsupportedMigrationSourceException : MigrationException
 {
     public string? SourceType { get; }
 
-    public UnsupportedMigrationSourceException(string message) : base(message)
+    public UnsupportedMigrationSourceException(string message) : base(message, ErrorCodes.UNSUPPORTED_MIGRATION_SOURCE)
     {
     }
 
     public UnsupportedMigrationSourceException(string sourceType, string message)
-        : base(message)
+        : base(message, ErrorCodes.UNSUPPORTED_MIGRATION_SOURCE)
     {
         SourceType = sourceType;
     }

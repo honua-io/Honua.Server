@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using Honua.MapSDK.Services.Terrain;
 using Honua.MapSDK.Utilities;
@@ -12,7 +13,8 @@ namespace Honua.Server.Host.API;
 /// Provides endpoints for terrain tiles, elevation profiles, and terrain analysis.
 /// </summary>
 [ApiController]
-[Route("api/terrain")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/terrain")]
 [Produces("application/json")]
 public class TerrainController : ControllerBase
 {

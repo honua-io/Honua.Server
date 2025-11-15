@@ -45,7 +45,8 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE id = @Id::uuid
             """;
 
-        var observation = await _connection.QuerySingleOrDefaultAsync<Observation>(
+        using var connection = _connectionFactory.CreateConnection();
+        var observation = await connection.QuerySingleOrDefaultAsync<Observation>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (observation != null)
@@ -75,14 +76,56 @@ public sealed partial class PostgresSensorThingsRepository
         var parameters = new DynamicParameters();
 
         // Apply filters
+        var whereClauses = new List<string>();
         if (options.Filter != null)
         {
-            var whereClause = TranslateFilter(options.Filter, parameters);
-            sql += $" WHERE {whereClause}";
-            countSql += $" WHERE {whereClause}";
+            whereClauses.Add(TranslateFilter(options.Filter, parameters));
         }
 
-        // Default ordering by phenomenon time descending
+        // CURSOR-BASED PAGINATION: Use phenomenon_time cursor for efficient pagination
+        // Supports both cursor-based (preferred) and offset-based (legacy) pagination
+        string? cursor = options.Cursor;
+        var offset = options.Skip ?? 0;
+        var limit = Math.Min(options.Top ?? 100, 10000);
+
+        // Warn about inefficient offset pagination for large offsets
+        if (offset > 1000 && string.IsNullOrEmpty(cursor))
+        {
+            _logger.LogWarning(
+                "Inefficient OFFSET pagination detected: OFFSET={Offset}. " +
+                "Consider using cursor-based pagination with phenomenon_time cursor for better performance.",
+                offset);
+        }
+
+        if (!string.IsNullOrEmpty(cursor))
+        {
+            // Cursor-based pagination: phenomenon_time < cursor
+            // Cursor format: ISO 8601 timestamp (e.g., "2024-11-14T10:30:00Z")
+            if (DateTime.TryParse(cursor, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cursorTime))
+            {
+                whereClauses.Add("phenomenon_time < @cursor");
+                parameters.Add("@cursor", cursorTime);
+            }
+            else
+            {
+                _logger.LogWarning("Invalid cursor format: {Cursor}. Expected ISO 8601 timestamp.", cursor);
+            }
+        }
+
+        // Build WHERE clause
+        if (whereClauses.Count > 0)
+        {
+            var whereClause = string.Join(" AND ", whereClauses);
+            sql += $" WHERE {whereClause}";
+
+            // For count, only include filter (not cursor)
+            if (options.Filter != null)
+            {
+                countSql += $" WHERE {TranslateFilter(options.Filter, new DynamicParameters())}";
+            }
+        }
+
+        // Default ordering by phenomenon time descending (required for cursor pagination)
         if (options.OrderBy?.Count > 0)
         {
             var orderClauses = options.OrderBy.Select(o =>
@@ -94,33 +137,49 @@ public sealed partial class PostgresSensorThingsRepository
             sql += " ORDER BY phenomenon_time DESC";
         }
 
-        // Apply pagination
-        var limit = Math.Min(options.Top ?? 100, 10000);
-        var offset = options.Skip ?? 0;
-        sql += $" LIMIT {limit} OFFSET {offset}";
+        // Apply pagination - use OFFSET only if no cursor provided (backward compatibility)
+        if (string.IsNullOrEmpty(cursor))
+        {
+            sql += $" LIMIT {limit} OFFSET {offset}";
+        }
+        else
+        {
+            sql += $" LIMIT {limit}";
+        }
 
-        var observations = await _connection.QueryAsync<Observation>(
+        using var connection = _connectionFactory.CreateConnection();
+        var observations = await connection.QueryAsync<Observation>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Generate self-links dynamically - Use deferred execution to avoid materializing collection
         var observationsWithLinks = observations.Select(o => o with { SelfLink = $"{_config.BasePath}/Observations({o.Id})" });
+        var observationsList = observationsWithLinks.ToList();
 
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
+        // Generate next link with cursor if available
         string? nextLink = null;
-        if (totalCount.HasValue && offset + limit < totalCount.Value)
+        if (observationsList.Count == limit)
         {
+            // Use cursor-based pagination for next link
+            var lastObservation = observationsList.Last();
+            var nextCursor = lastObservation.PhenomenonTime.ToString("O"); // ISO 8601 format
+            nextLink = $"{_config.BasePath}/Observations?cursor={Uri.EscapeDataString(nextCursor)}&$top={limit}";
+        }
+        else if (totalCount.HasValue && offset + limit < totalCount.Value)
+        {
+            // Fallback to offset-based for backward compatibility
             nextLink = $"{_config.BasePath}/Observations?$skip={offset + limit}&$top={limit}";
         }
 
         return new PagedResult<Observation>
         {
-            Items = observationsWithLinks.ToList(),
+            Items = observationsList,
             TotalCount = totalCount,
             NextLink = nextLink
         };
@@ -165,7 +224,8 @@ public sealed partial class PostgresSensorThingsRepository
                 server_timestamp
             """;
 
-        var created = await _connection.QuerySingleAsync<Observation>(
+        using var connection = _connectionFactory.CreateConnection();
+        var created = await connection.QuerySingleAsync<Observation>(
             new CommandDefinition(sql, new
             {
                 observation.PhenomenonTime,
@@ -204,8 +264,11 @@ public sealed partial class PostgresSensorThingsRepository
         }
 
         // For PostgreSQL, use COPY for maximum performance
-        var connection = _connection as NpgsqlConnection
+        // Create connection from factory and cast to NpgsqlConnection
+        await using var connection = _connectionFactory.CreateConnection() as NpgsqlConnection
             ?? throw new InvalidOperationException("PostgreSQL connection required for bulk operations");
+
+        await connection.OpenAsync(ct);
 
         const string copyCommand = """
             COPY sta_observations (
@@ -277,7 +340,8 @@ public sealed partial class PostgresSensorThingsRepository
     {
         const string sql = "DELETE FROM sta_observations WHERE id = @Id::uuid";
 
-        await _connection.ExecuteAsync(
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted Observation {ObservationId}", id);

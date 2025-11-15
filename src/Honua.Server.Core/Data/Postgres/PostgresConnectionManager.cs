@@ -30,15 +30,21 @@ internal sealed class PostgresConnectionManager : DisposableBase
     private readonly PostgresConnectionPoolMetrics _metrics;
     private readonly IConnectionStringEncryptionService? _encryptionService;
     private readonly ResiliencePipeline _retryPipeline;
+    private readonly DataAccessOptions? _options;
+    private readonly Microsoft.Extensions.Logging.ILogger? _logger;
 
     public PostgresConnectionManager(
         PostgresConnectionPoolMetrics metrics,
         IMemoryCache memoryCache,
-        IConnectionStringEncryptionService? encryptionService = null)
+        IConnectionStringEncryptionService? encryptionService = null,
+        DataAccessOptions? options = null,
+        Microsoft.Extensions.Logging.ILogger<PostgresConnectionManager>? logger = null)
     {
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _decryptionCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
         _encryptionService = encryptionService;
+        _options = options;
+        _logger = logger;
         _retryPipeline = DatabaseRetryPolicy.CreatePostgresRetryPipeline();
     }
 
@@ -187,7 +193,7 @@ internal sealed class PostgresConnectionManager : DisposableBase
         }
     }
 
-    private static void EnsureConnectionDefaults(NpgsqlConnectionStringBuilder builder)
+    private void EnsureConnectionDefaults(NpgsqlConnectionStringBuilder builder)
     {
         if (builder.ApplicationName.IsNullOrWhiteSpace())
         {
@@ -201,22 +207,46 @@ internal sealed class PostgresConnectionManager : DisposableBase
         // Setting to 2 reduces cold-start latency for first requests
         if (builder.MinPoolSize == 0)
         {
-            builder.MinPoolSize = 2;
+            var minSize = _options?.Postgres.MinPoolSize ?? 2;
+            builder.MinPoolSize = minSize;
         }
 
         // Maximum pool size - limit concurrent connections (default: 100)
-        // Web servers typically need 10-20 connections per CPU core
-        // This default works for small-medium deployments (adjust via connection string for large deployments)
+        // Support auto-scaling based on CPU core count
         if (builder.MaxPoolSize == 100)
         {
-            builder.MaxPoolSize = 50; // More conservative default
+            int maxSize = 50; // Default fallback
+
+            if (_options?.Postgres != null)
+            {
+                maxSize = _options.Postgres.GetEffectiveMaxSize();
+
+                if (_options.Postgres.AutoScale)
+                {
+                    _logger?.LogInformation(
+                        "PostgreSQL connection pool auto-scaling enabled: " +
+                        "CPUs={CpuCount}, ScaleFactor={ScaleFactor}, EffectiveMaxSize={MaxSize}",
+                        Environment.ProcessorCount,
+                        _options.Postgres.ScaleFactor,
+                        maxSize);
+                }
+                else
+                {
+                    _logger?.LogDebug(
+                        "PostgreSQL connection pool using configured max size: {MaxSize}",
+                        maxSize);
+                }
+            }
+
+            builder.MaxPoolSize = maxSize;
         }
 
         // Connection lifetime - recycle connections periodically (default: 0 = infinite)
         // Helps with load balancer failover and connection health
         if (builder.ConnectionLifetime == 0)
         {
-            builder.ConnectionLifetime = 600; // 10 minutes
+            var lifetime = _options?.Postgres.ConnectionLifetime ?? 600;
+            builder.ConnectionLifetime = lifetime;
         }
 
         // Command timeout - prevent long-running queries from blocking pool (default: 30 seconds)

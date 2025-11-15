@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blue-Green Deployment Configuration",
+  "description": "Example configuration for blue-green deployment with YARP traffic management",
+  "type": "object",
+  "properties": {
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "serviceName": {
+          "type": "string",
+          "description": "Name of the service cluster",
+          "example": "honua-api"
+        },
+        "version": {
+          "type": "object",
+          "properties": {
+            "blue": {
+              "type": "string",
+              "description": "Current production version",
+              "example": "v1.0.0"
+            },
+            "green": {
+              "type": "string",
+              "description": "New version to deploy",
+              "example": "v1.1.0"
+            }
+          }
+        },
+        "endpoints": {
+          "type": "object",
+          "properties": {
+            "blue": {
+              "type": "string",
+              "description": "Blue environment endpoint",
+              "example": "http://api-blue.honua.svc.cluster.local:8080"
+            },
+            "green": {
+              "type": "string",
+              "description": "Green environment endpoint",
+              "example": "http://api-green.honua.svc.cluster.local:8080"
+            }
+          }
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["instant", "gradual"],
+          "description": "Deployment strategy (instant cutover or gradual rollout)",
+          "example": "gradual"
+        },
+        "gradualRollout": {
+          "type": "object",
+          "description": "Configuration for gradual rollout (only if strategy=gradual)",
+          "properties": {
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "description": "Traffic percentage steps",
+              "example": [10, 25, 50, 100]
+            },
+            "soakDurationMinutes": {
+              "type": "integer",
+              "description": "Minutes to wait at each step before proceeding",
+              "minimum": 1,
+              "example": 5
+            },
+            "autoRollback": {
+              "type": "boolean",
+              "description": "Automatically rollback if health checks fail",
+              "example": true
+            }
+          }
+        },
+        "healthChecks": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable health checks before traffic switch",
+              "example": true
+            },
+            "endpoint": {
+              "type": "string",
+              "description": "Health check endpoint path",
+              "example": "/health/ready"
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Health check timeout in seconds",
+              "example": 30
+            },
+            "retries": {
+              "type": "integer",
+              "description": "Number of health check retries before marking as failed",
+              "example": 3
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "errorRateThreshold": {
+              "type": "number",
+              "description": "Maximum acceptable error rate (0.0-1.0)",
+              "minimum": 0,
+              "maximum": 1,
+              "example": 0.05
+            },
+            "latencyP95ThresholdMs": {
+              "type": "integer",
+              "description": "Maximum acceptable P95 latency in milliseconds",
+              "example": 2000
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "deployment": {
+        "serviceName": "honua-api",
+        "version": {
+          "blue": "v1.0.0",
+          "green": "v1.1.0"
+        },
+        "endpoints": {
+          "blue": "http://api-blue.honua.svc.cluster.local:8080",
+          "green": "http://api-green.honua.svc.cluster.local:8080"
+        },
+        "strategy": "gradual",
+        "gradualRollout": {
+          "steps": [10, 25, 50, 100],
+          "soakDurationMinutes": 5,
+          "autoRollback": true
+        },
+        "healthChecks": {
+          "enabled": true,
+          "endpoint": "/health/ready",
+          "timeout": 30,
+          "retries": 3
+        },
+        "metrics": {
+          "errorRateThreshold": 0.05,
+          "latencyP95ThresholdMs": 2000
+        }
+      }
+    },
+    {
+      "deployment": {
+        "serviceName": "honua-intake",
+        "version": {
+          "blue": "v2.3.1",
+          "green": "v2.4.0"
+        },
+        "endpoints": {
+          "blue": "http://intake-blue:8080",
+          "green": "http://intake-green:8080"
+        },
+        "strategy": "instant",
+        "healthChecks": {
+          "enabled": true,
+          "endpoint": "/health",
+          "timeout": 10,
+          "retries": 2
+        },
+        "metrics": {
+          "errorRateThreshold": 0.01,
+          "latencyP95ThresholdMs": 1000
+        }
+      }
+    }
+  ]
+}

@@ -2,6 +2,10 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 using System.Net;
 using System.Threading.RateLimiting;
+using Honua.Server.Core.BlueGreen;
+using Honua.Server.Gateway.Configuration;
+using Honua.Server.Gateway.Endpoints;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -91,10 +95,15 @@ try
     }
 
     // Add Rate Limiting
+    // Store rate limit configuration for use in middleware
+    var globalPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:GlobalPermitLimit", 1000);
+    var globalWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:GlobalWindowSeconds", 60);
+    var perIpPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:PerIpPermitLimit", 100);
+    var perIpWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:PerIpWindowSeconds", 60);
+    var exposeHeaders = builder.Configuration.GetValue<bool>("RateLimiting:ExposeHeaders", true);
+
     builder.Services.AddRateLimiter(options =>
     {
-        var globalPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:GlobalPermitLimit", 1000);
-        var globalWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:GlobalWindowSeconds", 60);
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
             RateLimitPartition.GetFixedWindowLimiter("global", _ => new FixedWindowRateLimiterOptions
             {
@@ -104,8 +113,6 @@ try
                 QueueLimit = 10
             }));
 
-        var perIpPermitLimit = builder.Configuration.GetValue<int>("RateLimiting:PerIpPermitLimit", 100);
-        var perIpWindowSeconds = builder.Configuration.GetValue<int>("RateLimiting:PerIpWindowSeconds", 60);
         options.AddPolicy<string>("per-ip", httpContext =>
         {
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -123,13 +130,24 @@ try
         options.OnRejected = async (context, cancellationToken) =>
         {
             context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            context.HttpContext.Response.Headers["Retry-After"] = "60";
+
+            // Add rate limit headers on rejection
+            if (exposeHeaders)
+            {
+                // Use the more restrictive limit (per-IP)
+                context.HttpContext.Response.Headers["X-RateLimit-Limit"] = perIpPermitLimit.ToString();
+                context.HttpContext.Response.Headers["X-RateLimit-Remaining"] = "0";
+                context.HttpContext.Response.Headers["X-RateLimit-Reset"] =
+                    DateTimeOffset.UtcNow.AddSeconds(perIpWindowSeconds).ToUnixTimeSeconds().ToString();
+            }
+
+            context.HttpContext.Response.Headers["Retry-After"] = perIpWindowSeconds.ToString();
 
             await context.HttpContext.Response.WriteAsJsonAsync(new
             {
                 error = "Too many requests",
                 message = "Rate limit exceeded. Please try again later.",
-                retryAfter = 60
+                retryAfter = perIpWindowSeconds
             }, cancellationToken);
 
             Log.Warning("Rate limit exceeded for {IpAddress} on {Path}",
@@ -138,9 +156,16 @@ try
         };
     });
 
-    // Configure YARP Reverse Proxy
+    // Configure YARP Reverse Proxy with InMemoryConfigProvider
+    // This loads the initial configuration from appsettings.json but allows
+    // dynamic updates at runtime for blue-green deployments and traffic management
+    var inMemoryConfigProvider = YarpConfigurationExtensions.LoadFromConfiguration(
+        builder.Configuration.GetSection("ReverseProxy"));
+
+    builder.Services.AddSingleton<IProxyConfigProvider>(inMemoryConfigProvider);
+
     builder.Services.AddReverseProxy()
-        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+        .LoadFromMemory(inMemoryConfigProvider.GetConfig().Routes, inMemoryConfigProvider.GetConfig().Clusters)
         .AddTransforms(builderContext =>
         {
             // Add security headers
@@ -180,6 +205,60 @@ try
             });
         });
 
+    // Register BlueGreenTrafficManager with the InMemoryConfigProvider
+    // This enables dynamic traffic switching without restarting the gateway
+    builder.Services.AddSingleton(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<BlueGreenTrafficManager>>();
+        var configProvider = sp.GetRequiredService<IProxyConfigProvider>();
+        return new BlueGreenTrafficManager(logger, configProvider);
+    });
+
+    // Add HttpClient factory for health checks
+    builder.Services.AddHttpClient();
+
+    // Add Authentication and Authorization for traffic management endpoints
+    // This uses JWT bearer tokens to protect admin endpoints
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            var jwtSettings = builder.Configuration.GetSection("Authentication:Jwt");
+            options.Authority = jwtSettings["Authority"];
+            options.Audience = jwtSettings["Audience"];
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+
+            // For development/testing with API keys
+            if (builder.Environment.IsDevelopment())
+            {
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        // Allow API key authentication for testing
+                        if (context.Request.Headers.TryGetValue("X-API-Key", out var apiKey))
+                        {
+                            var configuredApiKey = builder.Configuration["Authentication:ApiKey"];
+                            if (!string.IsNullOrEmpty(configuredApiKey) && apiKey == configuredApiKey)
+                            {
+                                // API key is valid, skip token validation
+                                context.Success();
+                            }
+                        }
+                        return Task.CompletedTask;
+                    }
+                };
+            }
+        });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminPolicy", policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireRole("Admin", "TrafficManager");
+        });
+    });
+
     // Add CORS
     builder.Services.AddCors(options =>
     {
@@ -198,7 +277,13 @@ try
 
             policy.AllowAnyMethod()
                   .AllowAnyHeader()
-                  .WithExposedHeaders("X-Request-ID", "X-Correlation-ID");
+                  .WithExposedHeaders(
+                      "X-Request-ID",
+                      "X-Correlation-ID",
+                      "X-RateLimit-Limit",
+                      "X-RateLimit-Remaining",
+                      "X-RateLimit-Reset",
+                      "Retry-After");
         });
     });
 
@@ -225,8 +310,79 @@ try
     // CORS
     app.UseCors();
 
+    // Authentication and Authorization
+    app.UseAuthentication();
+    app.UseAuthorization();
+
     // Rate limiting
     app.UseRateLimiter();
+
+    // Rate limit headers middleware
+    // This middleware runs AFTER rate limiting and adds X-RateLimit-* headers to ALL responses
+    // to provide clients with quota information for implementing intelligent retry logic
+    if (exposeHeaders)
+    {
+        app.Use(async (context, next) =>
+        {
+            // Store the original response body stream
+            var originalBodyStream = context.Response.Body;
+
+            try
+            {
+                // Execute the rest of the pipeline
+                await next();
+
+                // After rate limiting has executed, add headers
+                // Note: We can't access the actual lease statistics from FixedWindowRateLimiter
+                // through the public API, so we provide the configured limits
+                // The actual "remaining" count would require custom rate limiter implementation
+
+                // Determine which policy is active for this request
+                var endpoint = context.GetEndpoint();
+                var rateLimitPolicy = endpoint?.Metadata.GetMetadata<IRateLimiterPolicy<string>>();
+
+                // Default to per-IP limits (more restrictive)
+                var limit = perIpPermitLimit;
+                var windowSeconds = perIpWindowSeconds;
+
+                // Calculate reset time (start of next window)
+                // For fixed window, reset occurs at fixed intervals
+                var now = DateTimeOffset.UtcNow;
+                var windowStart = new DateTimeOffset(
+                    now.Year, now.Month, now.Day, now.Hour, now.Minute,
+                    (now.Second / windowSeconds) * windowSeconds, 0, TimeSpan.Zero);
+                var resetTime = windowStart.AddSeconds(windowSeconds);
+
+                // Add headers if not already present (OnRejected handler may have set them)
+                if (!context.Response.Headers.ContainsKey("X-RateLimit-Limit"))
+                {
+                    context.Response.Headers["X-RateLimit-Limit"] = limit.ToString();
+                }
+
+                if (!context.Response.Headers.ContainsKey("X-RateLimit-Reset"))
+                {
+                    context.Response.Headers["X-RateLimit-Reset"] = resetTime.ToUnixTimeSeconds().ToString();
+                }
+
+                // Note: We set a placeholder for "Remaining" since we cannot access the actual
+                // lease statistics from the rate limiter without a custom implementation
+                // In a production system, you would:
+                // 1. Use a custom rate limiter that exposes statistics
+                // 2. Store counters in Redis/distributed cache
+                // 3. Use response headers from the rate limiter's lease metadata
+                if (!context.Response.Headers.ContainsKey("X-RateLimit-Remaining"))
+                {
+                    // For now, indicate available unless explicitly rejected
+                    context.Response.Headers["X-RateLimit-Remaining"] =
+                        context.Response.StatusCode == 429 ? "0" : limit.ToString();
+                }
+            }
+            finally
+            {
+                context.Response.Body = originalBodyStream;
+            }
+        });
+    }
 
     // Health checks
     app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
@@ -247,6 +403,10 @@ try
     // Prometheus metrics endpoint
     app.MapPrometheusScrapingEndpoint("/metrics");
 
+    // Traffic management endpoints for blue-green deployments
+    // These endpoints allow dynamic traffic switching without restarting the gateway
+    app.MapTrafficManagementEndpoints();
+
     // Map reverse proxy
     app.MapReverseProxy();
 
@@ -258,6 +418,17 @@ try
         builder.Configuration.GetValue<int>("RateLimiting:GlobalWindowSeconds", 60),
         builder.Configuration.GetValue<int>("RateLimiting:PerIpPermitLimit", 100),
         builder.Configuration.GetValue<int>("RateLimiting:PerIpWindowSeconds", 60));
+
+    // Log traffic management configuration
+    var trafficMgmtEnabled = builder.Configuration.GetValue<bool>("TrafficManagement:Enabled", true);
+    Log.Information("Traffic Management - Enabled: {Enabled}", trafficMgmtEnabled);
+    if (trafficMgmtEnabled)
+    {
+        Log.Information("Dynamic configuration provider: InMemoryConfigProvider (blue-green deployments enabled)");
+        Log.Information("Loaded {RouteCount} routes and {ClusterCount} clusters from configuration",
+            inMemoryConfigProvider.GetConfig().Routes.Count,
+            inMemoryConfigProvider.GetConfig().Clusters.Count);
+    }
 
     await app.RunAsync();
 }

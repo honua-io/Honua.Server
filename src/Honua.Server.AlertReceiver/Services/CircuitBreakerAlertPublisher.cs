@@ -72,4 +72,22 @@ public sealed class CircuitBreakerAlertPublisher : IAlertPublisher
             throw;
         }
     }
+
+    public async Task<AlertDeliveryResult> PublishWithResultAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await this.circuitBreaker.ExecuteAsync(async () =>
+            {
+                return await this.innerPublisher.PublishWithResultAsync(webhook, severity, cancellationToken);
+            });
+        }
+        catch (BrokenCircuitException)
+        {
+            this.logger.LogWarning(
+                "Alert not sent to {Publisher} - circuit breaker is OPEN",
+                this.publisherName);
+            throw;
+        }
+    }
 }

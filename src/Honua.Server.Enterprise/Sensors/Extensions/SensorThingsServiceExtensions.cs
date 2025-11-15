@@ -5,8 +5,6 @@ using Honua.Server.Enterprise.Sensors.Data.Postgres;
 using Honua.Server.Enterprise.Sensors.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
-using System.Data;
 
 namespace Honua.Server.Enterprise.Sensors.Extensions;
 
@@ -32,8 +30,9 @@ public static class SensorThingsServiceExtensions
         var connectionString = configuration.GetConnectionString("SensorThingsDb");
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            // Register IDbConnection for SensorThings
-            services.AddScoped<IDbConnection>(sp => new NpgsqlConnection(connectionString));
+            // Register connection factory as Singleton (factory doesn't hold resources)
+            services.AddSingleton<ISensorThingsDbConnectionFactory>(
+                new NpgsqlSensorThingsDbConnectionFactory(connectionString));
 
             // Register repository
             services.AddScoped<ISensorThingsRepository, PostgresSensorThingsRepository>();

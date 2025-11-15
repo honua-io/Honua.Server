@@ -42,5 +42,13 @@
 
     <!-- Security -->
     <PackageReference Include="Polly" Version="8.5.0" />
+
+    <!-- Authentication & Authorization -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Project References -->
+    <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
   </ItemGroup>
 </Project>

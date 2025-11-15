@@ -9,11 +9,19 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public class CacheException : HonuaException
 {
-    public CacheException(string message) : base(message)
+    public CacheException(string message) : base(message, ErrorCodes.CACHE_ERROR)
     {
     }
 
-    public CacheException(string message, Exception innerException) : base(message, innerException)
+    public CacheException(string message, Exception innerException) : base(message, ErrorCodes.CACHE_ERROR, innerException)
+    {
+    }
+
+    public CacheException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public CacheException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
     {
     }
 }
@@ -28,13 +36,13 @@ public sealed class CacheUnavailableException : CacheException, ITransientExcept
     public bool IsTransient => true;
 
     public CacheUnavailableException(string cacheName, string message)
-        : base($"Cache '{cacheName}' is unavailable: {message}")
+        : base($"Cache '{cacheName}' is unavailable: {message}", ErrorCodes.CACHE_UNAVAILABLE)
     {
         CacheName = cacheName;
     }
 
     public CacheUnavailableException(string cacheName, string message, Exception innerException)
-        : base($"Cache '{cacheName}' is unavailable: {message}", innerException)
+        : base($"Cache '{cacheName}' is unavailable: {message}", ErrorCodes.CACHE_UNAVAILABLE, innerException)
     {
         CacheName = cacheName;
     }
@@ -49,7 +57,7 @@ public sealed class CacheKeyNotFoundException : CacheException
     public string Key { get; }
 
     public CacheKeyNotFoundException(string key)
-        : base($"Cache key '{key}' was not found.")
+        : base($"Cache key '{key}' was not found.", ErrorCodes.CACHE_KEY_NOT_FOUND)
     {
         Key = key;
     }
@@ -65,7 +73,7 @@ public sealed class CacheWriteException : CacheException, ITransientException
     public bool IsTransient => true;
 
     public CacheWriteException(string cacheName, string message, Exception innerException)
-        : base($"Failed to write to cache '{cacheName}': {message}", innerException)
+        : base($"Failed to write to cache '{cacheName}': {message}", ErrorCodes.CACHE_WRITE_FAILED, innerException)
     {
         CacheName = cacheName;
     }
@@ -87,7 +95,7 @@ public sealed class CacheInvalidationException : CacheException, ITransientExcep
         string cacheKey,
         string message,
         int attemptNumber = 1)
-        : base($"Failed to invalidate cache '{cacheName}' key '{cacheKey}' (attempt {attemptNumber}): {message}")
+        : base($"Failed to invalidate cache '{cacheName}' key '{cacheKey}' (attempt {attemptNumber}): {message}", ErrorCodes.CACHE_INVALIDATION_FAILED)
     {
         CacheName = cacheName;
         CacheKey = cacheKey;
@@ -100,7 +108,7 @@ public sealed class CacheInvalidationException : CacheException, ITransientExcep
         string message,
         Exception innerException,
         int attemptNumber = 1)
-        : base($"Failed to invalidate cache '{cacheName}' key '{cacheKey}' (attempt {attemptNumber}): {message}", innerException)
+        : base($"Failed to invalidate cache '{cacheName}' key '{cacheKey}' (attempt {attemptNumber}): {message}", ErrorCodes.CACHE_INVALIDATION_FAILED, innerException)
     {
         CacheName = cacheName;
         CacheKey = cacheKey;

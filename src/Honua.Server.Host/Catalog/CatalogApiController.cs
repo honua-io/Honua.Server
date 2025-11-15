@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using Asp.Versioning;
 using Honua.Server.Core.Catalog;
 using Honua.Server.Core.Extensions;
 using Honua.Server.Core.Metadata;
@@ -22,8 +23,9 @@ using Microsoft.Extensions.Logging;
 namespace Honua.Server.Host.Catalog;
 
 [ApiController]
+[ApiVersion("1.0")]
 [Authorize(Policy = "RequireViewer")]
-[Route("api/catalog")]
+[Route("api/v{version:apiVersion}/catalogs")]
 public sealed class CatalogApiController : ControllerBase
 {
     private readonly ICatalogProjectionService catalog;
@@ -145,6 +147,24 @@ public sealed class CatalogApiController : ControllerBase
             });
     }
 
+    /// <summary>
+    /// Retrieves a specific catalog record by service and layer identifier.
+    /// </summary>
+    /// <param name="serviceId">The unique identifier of the service containing the layer.</param>
+    /// <param name="layerId">The unique identifier of the layer within the service.</param>
+    /// <returns>The detailed catalog record including metadata, links, and spatial/temporal extent information.</returns>
+    /// <response code="200">Catalog record retrieved successfully</response>
+    /// <response code="404">Catalog record not found for the specified service and layer combination</response>
+    /// <remarks>
+    /// This endpoint provides comprehensive metadata about a specific layer including:
+    /// - Layer title and description
+    /// - Service information
+    /// - Spatial and temporal extents
+    /// - Related links (self, alternate HTML view, ESRI service)
+    /// - Keywords and themes for discovery
+    ///
+    /// Results are cached according to the CatalogRecord output cache policy.
+    /// </remarks>
     [HttpGet("{serviceId}/{layerId}")]
     [ProducesResponseType(typeof(CatalogRecordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -211,7 +231,7 @@ public sealed class CatalogApiController : ControllerBase
         links.Add(new CatalogLinkResponse
         {
             Rel = "self",
-            Href = CombinePath(hrefBase, $"/api/catalog/{record.ServiceId}/{record.LayerId}"),
+            Href = CombinePath(hrefBase, $"/api/v1.0/catalogs/{record.ServiceId}/{record.LayerId}"),
             Type = "application/json",
             Title = record.Title
         });

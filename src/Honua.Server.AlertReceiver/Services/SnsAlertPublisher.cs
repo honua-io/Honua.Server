@@ -80,6 +80,23 @@ public sealed class SnsAlertPublisher : IAlertPublisher
         }
     }
 
+    public async Task<AlertDeliveryResult> PublishWithResultAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
+    {
+        var result = new AlertDeliveryResult();
+        try
+        {
+            await this.PublishAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
+            result.SuccessfulChannels.Add("SNS");
+        }
+        catch (Exception)
+        {
+            result.FailedChannels.Add("SNS");
+            throw;
+        }
+
+        return result;
+    }
+
     private string GetTopicArn(string severity)
     {
         // Map severity levels to SNS topic ARNs

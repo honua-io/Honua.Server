@@ -17,6 +17,36 @@ using Honua.Server.Host.Utilities;
 namespace Honua.Server.Host.Filters;
 
 /// <summary>
+/// Error code constants for Microsoft Azure REST API Guidelines compliance.
+/// </summary>
+/// <remarks>
+/// These error codes are included in both the x-ms-error-code response header
+/// and the ProblemDetails extensions for consistent error identification.
+/// </remarks>
+public static class ErrorCodes
+{
+    /// <summary>
+    /// Error code for validation failures (400 Bad Request with validation errors).
+    /// </summary>
+    public const string ValidationFailed = "VALIDATION_FAILED";
+
+    /// <summary>
+    /// Error code for unauthorized access attempts (401 Unauthorized).
+    /// </summary>
+    public const string Unauthorized = "UNAUTHORIZED";
+
+    /// <summary>
+    /// Error code for bad request errors (400 Bad Request).
+    /// </summary>
+    public const string BadRequest = "BAD_REQUEST";
+
+    /// <summary>
+    /// Error code for internal server errors (500 Internal Server Error).
+    /// </summary>
+    public const string InternalServerError = "INTERNAL_SERVER_ERROR";
+}
+
+/// <summary>
 /// Global exception filter that provides secure, consistent exception handling across all API endpoints.
 /// </summary>
 /// <remarks>
@@ -192,6 +222,12 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         // Create appropriate ProblemDetails response based on exception type
         var problemDetails = CreateProblemDetailsForException(exception, requestId, correlationId);
 
+        // Add x-ms-error-code header for Microsoft Azure REST API Guidelines compliance
+        if (problemDetails.Extensions.TryGetValue("errorCode", out var errorCode))
+        {
+            context.HttpContext.Response.Headers["x-ms-error-code"] = errorCode?.ToString() ?? string.Empty;
+        }
+
         context.Result = new ObjectResult(problemDetails)
         {
             StatusCode = problemDetails.Status
@@ -244,6 +280,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
         problemDetails.Extensions[CorrelationIdConstants.ProblemDetailsExtensionKey] = correlationId;
         problemDetails.Extensions["requestId"] = requestId;
         problemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+        problemDetails.Extensions["errorCode"] = ErrorCodes.ValidationFailed;
 
         return problemDetails;
     }
@@ -266,7 +303,8 @@ public sealed class SecureExceptionFilter : IExceptionFilter
             {
                 [CorrelationIdConstants.ProblemDetailsExtensionKey] = correlationId,
                 ["requestId"] = requestId,
-                ["timestamp"] = DateTimeOffset.UtcNow
+                ["timestamp"] = DateTimeOffset.UtcNow,
+                ["errorCode"] = ErrorCodes.Unauthorized
             }
         };
     }
@@ -295,7 +333,8 @@ public sealed class SecureExceptionFilter : IExceptionFilter
             {
                 [CorrelationIdConstants.ProblemDetailsExtensionKey] = correlationId,
                 ["requestId"] = requestId,
-                ["timestamp"] = DateTimeOffset.UtcNow
+                ["timestamp"] = DateTimeOffset.UtcNow,
+                ["errorCode"] = ErrorCodes.BadRequest
             }
         };
     }
@@ -326,6 +365,7 @@ public sealed class SecureExceptionFilter : IExceptionFilter
                 [CorrelationIdConstants.ProblemDetailsExtensionKey] = correlationId,
                 ["requestId"] = requestId,
                 ["timestamp"] = DateTimeOffset.UtcNow,
+                ["errorCode"] = ErrorCodes.InternalServerError,
                 // In development, include exception type to help with debugging
                 ["exceptionType"] = this.environment.IsDevelopment()
                     ? exception.GetType().Name

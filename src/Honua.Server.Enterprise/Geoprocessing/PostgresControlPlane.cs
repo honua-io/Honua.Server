@@ -9,6 +9,7 @@ using Dapper;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Honua.Server.Enterprise.Data;
+using Honua.Server.Enterprise.Geoprocessing.Webhooks;
 
 namespace Honua.Server.Enterprise.Geoprocessing;
 
@@ -38,17 +39,21 @@ public partial class PostgresControlPlane : IControlPlane
     /// </summary>
     private static readonly Regex JobIdPattern = JobIdRegex();
 
+    private readonly IWebhookDeliveryService? _webhookDeliveryService;
+
     public PostgresControlPlane(
         string connectionString,
         IProcessRegistry processRegistry,
         ITierExecutor tierExecutor,
-        ILogger<PostgresControlPlane> logger)
+        ILogger<PostgresControlPlane> logger,
+        IWebhookDeliveryService? webhookDeliveryService = null)
     {
         DapperBootstrapper.EnsureConfigured();
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _processRegistry = processRegistry ?? throw new ArgumentNullException(nameof(processRegistry));
         _tierExecutor = tierExecutor ?? throw new ArgumentNullException(nameof(tierExecutor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _webhookDeliveryService = webhookDeliveryService;
     }
 
     public async Task<AdmissionDecision> AdmitAsync(ProcessExecutionRequest request, CancellationToken ct = default)
@@ -544,6 +549,87 @@ public partial class PostgresControlPlane : IControlPlane
         _logger.LogError(error, "Recorded failure for job {JobId}, tier={Tier}", jobId, tier);
     }
 
+    public async Task UpdateJobProgressAsync(string jobId, int progressPercent, string? progressMessage = null, CancellationToken ct = default)
+    {
+        // Validate progress is within valid range
+        if (progressPercent < 0 || progressPercent > 100)
+        {
+            _logger.LogWarning(
+                "Invalid progress percent {Progress} for job {JobId}. Progress must be between 0 and 100.",
+                progressPercent, jobId);
+            return;
+        }
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+
+        const string sql = @"
+            UPDATE process_runs
+            SET progress = @Progress,
+                progress_message = @ProgressMessage
+            WHERE job_id = @JobId
+            AND status = 'running'";
+
+        var rowsAffected = await connection.ExecuteAsync(sql, new
+        {
+            JobId = jobId,
+            Progress = progressPercent,
+            ProgressMessage = progressMessage
+        });
+
+        if (rowsAffected > 0)
+        {
+            _logger.LogDebug(
+                "Updated progress for job {JobId}: {Progress}% - {Message}",
+                jobId, progressPercent, progressMessage);
+        }
+        else
+        {
+            _logger.LogDebug(
+                "Could not update progress for job {JobId} - job may not be in 'running' status",
+                jobId);
+        }
+    }
+
+    public async Task<bool> RequeueJobForRetryAsync(string jobId, int retryCount, string errorMessage, CancellationToken ct = default)
+    {
+        // Validate job ID format and length to prevent SQL injection
+        ValidateJobId(jobId);
+
+        await using var connection = new NpgsqlConnection(_connectionString);
+
+        const string sql = @"
+            UPDATE process_runs
+            SET status = 'pending',
+                retry_count = @RetryCount,
+                error_message = @ErrorMessage,
+                started_at = NULL,
+                worker_id = NULL
+            WHERE job_id = @JobId
+            AND status = 'running'";
+
+        var rowsAffected = await connection.ExecuteAsync(sql, new
+        {
+            JobId = jobId,
+            RetryCount = retryCount,
+            ErrorMessage = errorMessage
+        });
+
+        if (rowsAffected > 0)
+        {
+            _logger.LogInformation(
+                "Requeued job {JobId} for retry (attempt {RetryCount})",
+                jobId, retryCount);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Failed to requeue job {JobId} - job not found or not in running state",
+                jobId);
+        }
+
+        return rowsAffected > 0;
+    }
+
     public async Task<ProcessExecutionStatistics> GetStatisticsAsync(Guid? tenantId = null, DateTimeOffset? startTime = null, DateTimeOffset? endTime = null, CancellationToken ct = default)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
@@ -784,4 +870,115 @@ public partial class PostgresControlPlane : IControlPlane
     /// </summary>
     [GeneratedRegex(@"^job-\d{8}-[a-f0-9]{32}$", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex JobIdRegex();
+
+    /// <summary>
+    /// Enqueues a webhook delivery for a job completion notification
+    /// </summary>
+    /// <param name="run">The process run that completed</param>
+    /// <param name="result">The process result</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    public async Task EnqueueWebhookAsync(ProcessRun run, ProcessResult result, CancellationToken cancellationToken = default)
+    {
+        if (run == null) throw new ArgumentNullException(nameof(run));
+        if (result == null) throw new ArgumentNullException(nameof(result));
+
+        // Skip if no webhook URL configured
+        if (string.IsNullOrWhiteSpace(run.WebhookUrl))
+        {
+            _logger.LogDebug("No webhook URL configured for job {JobId}, skipping webhook delivery", run.JobId);
+            return;
+        }
+
+        // Skip if webhook delivery service not available
+        if (_webhookDeliveryService == null)
+        {
+            _logger.LogWarning(
+                "Webhook delivery service not configured. Unable to deliver webhook for job {JobId} to {WebhookUrl}",
+                run.JobId, run.WebhookUrl);
+            return;
+        }
+
+        try
+        {
+            // Create webhook payload
+            var payload = new JobCompletionWebhookPayload
+            {
+                JobId = run.JobId,
+                ProcessId = run.ProcessId,
+                TenantId = run.TenantId.ToString(),
+                Status = run.Status.ToString().ToLowerInvariant(),
+                Success = result.Success,
+                CreatedAt = run.CreatedAt,
+                CompletedAt = run.CompletedAt,
+                DurationMs = result.DurationMs,
+                OutputUrl = result.OutputUrl,
+                ErrorMessage = result.ErrorMessage,
+                FeaturesProcessed = result.FeaturesProcessed,
+                Metadata = result.Metadata
+            };
+
+            // Create webhook delivery request
+            var delivery = new WebhookDelivery
+            {
+                JobId = run.JobId,
+                WebhookUrl = run.WebhookUrl,
+                Payload = ConvertPayloadToDictionary(payload),
+                TenantId = run.TenantId.ToString(),
+                ProcessId = run.ProcessId,
+                MaxAttempts = 5 // Retry up to 5 times with exponential backoff
+            };
+
+            // Enqueue for delivery
+            var deliveryId = await _webhookDeliveryService.EnqueueAsync(delivery, cancellationToken);
+
+            _logger.LogInformation(
+                "Enqueued webhook delivery {DeliveryId} for job {JobId} to {WebhookUrl}",
+                deliveryId, run.JobId, run.WebhookUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to enqueue webhook delivery for job {JobId} to {WebhookUrl}",
+                run.JobId, run.WebhookUrl);
+            // Don't throw - webhook delivery failure should not fail the job completion
+        }
+    }
+
+    /// <summary>
+    /// Converts webhook payload object to dictionary for JSON serialization
+    /// </summary>
+    private static Dictionary<string, object> ConvertPayloadToDictionary(JobCompletionWebhookPayload payload)
+    {
+        var dict = new Dictionary<string, object>
+        {
+            ["event"] = payload.Event,
+            ["job_id"] = payload.JobId,
+            ["process_id"] = payload.ProcessId,
+            ["tenant_id"] = payload.TenantId,
+            ["status"] = payload.Status,
+            ["success"] = payload.Success,
+            ["created_at"] = payload.CreatedAt,
+            ["timestamp"] = payload.Timestamp
+        };
+
+        if (payload.CompletedAt.HasValue)
+            dict["completed_at"] = payload.CompletedAt.Value;
+
+        if (payload.DurationMs.HasValue)
+            dict["duration_ms"] = payload.DurationMs.Value;
+
+        if (!string.IsNullOrEmpty(payload.OutputUrl))
+            dict["output_url"] = payload.OutputUrl;
+
+        if (!string.IsNullOrEmpty(payload.ErrorMessage))
+            dict["error_message"] = payload.ErrorMessage;
+
+        if (payload.FeaturesProcessed.HasValue)
+            dict["features_processed"] = payload.FeaturesProcessed.Value;
+
+        if (payload.Metadata != null && payload.Metadata.Count > 0)
+            dict["metadata"] = payload.Metadata;
+
+        return dict;
+    }
 }

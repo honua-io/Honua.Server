@@ -182,22 +182,42 @@ public sealed class GenericAlertController : ControllerBase
                 return this.Ok(new { status = "deduplicated", alertName = alert.Name, fingerprint });
             }
 
+            // DURABLE QUEUE PATTERN: Persist alert BEFORE sending to ensure no loss on server crash
+            long alertId;
+            try
+            {
+                alertId = await this.persistenceService.PersistAlertBeforeSendAsync(alert, cancellationToken);
+            }
+            catch (AlertPersistenceException)
+            {
+                // If we can't persist, we should not send (fail-safe behavior)
+                await this.deduplicator.ReleaseReservationAsync(reservationId, cancellationToken);
+                throw;
+            }
+
             // Convert to AlertManager format for compatibility
             var webhook = GenericAlertAdapter.ToAlertManagerWebhook(alert);
 
-            // Publish to all configured providers
-            var publishedTo = new List<string>();
-            bool publishingSucceeded = false;
+            // Publish to all configured providers and track per-channel results
+            AlertDeliveryResult deliveryResult;
             string? publishingError = null;
 
             try
             {
-                await this.alertPublisher.PublishAsync(webhook, routingSeverity, cancellationToken);
-                publishedTo.Add("all_configured_providers");
-                publishingSucceeded = true;
+                deliveryResult = await this.alertPublisher.PublishWithResultAsync(webhook, routingSeverity, cancellationToken);
 
-                // Record success in deduplicator only if publishing succeeded
-                await this.deduplicator.RecordAlertAsync(fingerprint, routingSeverity, reservationId, cancellationToken);
+                // Update delivery status in database
+                await this.persistenceService.UpdateDeliveryStatusAsync(alertId, deliveryResult, cancellationToken);
+
+                // Record success in deduplicator if at least some channels succeeded
+                if (!deliveryResult.AllFailed)
+                {
+                    await this.deduplicator.RecordAlertAsync(fingerprint, routingSeverity, reservationId, cancellationToken);
+                }
+                else
+                {
+                    await this.deduplicator.ReleaseReservationAsync(reservationId, cancellationToken);
+                }
             }
             catch (Exception publishEx)
             {
@@ -205,23 +225,40 @@ public sealed class GenericAlertController : ControllerBase
                 this.logger.LogError(publishEx, "Failed to publish alert: {Name}", alert.Name);
                 this.metricsService.RecordAlertSuppressed("publish_failure", alert.Severity);
                 await this.deduplicator.ReleaseReservationAsync(reservationId, cancellationToken);
+
+                // Create a failed delivery result
+                deliveryResult = new AlertDeliveryResult();
+                await this.persistenceService.UpdateDeliveryStatusAsync(alertId, deliveryResult, cancellationToken);
             }
 
             // Record latency
             var latency = DateTime.UtcNow - startTime;
             this.metricsService.RecordAlertLatency("composite", latency);
 
-            // Persist alert with suppression status if publishing failed
-            await this.persistenceService.SaveAlertAsync(
-                alert,
-                publishedTo.ToArray(),
-                !publishingSucceeded,
-                publishingSucceeded ? null : "publish_failure");
-
             // Return appropriate status based on publishing result
-            if (publishingSucceeded)
+            if (deliveryResult.AllSucceeded)
             {
-                return this.Ok(new { status = "sent", alertName = alert.Name, fingerprint, publishedTo });
+                return this.Ok(new
+                {
+                    status = "sent",
+                    alertName = alert.Name,
+                    fingerprint,
+                    publishedTo = deliveryResult.SuccessfulChannels.ToArray(),
+                    alertId,
+                });
+            }
+            else if (deliveryResult.PartiallyFailed)
+            {
+                return this.Ok(new
+                {
+                    status = "partially_sent",
+                    alertName = alert.Name,
+                    fingerprint,
+                    publishedTo = deliveryResult.SuccessfulChannels.ToArray(),
+                    failedChannels = deliveryResult.FailedChannels.ToArray(),
+                    alertId,
+                    error = "Some channels failed",
+                });
             }
             else
             {
@@ -231,7 +268,9 @@ public sealed class GenericAlertController : ControllerBase
                     alertName = alert.Name,
                     fingerprint,
                     publishedTo = Array.Empty<string>(),
-                    error = publishingError,
+                    failedChannels = deliveryResult.FailedChannels.ToArray(),
+                    alertId,
+                    error = publishingError ?? "All channels failed",
                 });
             }
         }

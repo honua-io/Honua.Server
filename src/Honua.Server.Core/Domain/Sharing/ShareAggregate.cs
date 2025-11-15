@@ -242,9 +242,9 @@ public sealed class ShareAggregate : AggregateRoot<string>
             MapId,
             comment.Id,
             author,
-            isGuest: false,
+            IsGuest: false,
             text,
-            requiresApproval: false));
+            RequiresApproval: false));
     }
 
     /// <summary>
@@ -295,9 +295,9 @@ public sealed class ShareAggregate : AggregateRoot<string>
             MapId,
             comment.Id,
             guestName,
-            isGuest: true,
+            IsGuest: true,
             text,
-            requiresApproval: true));
+            RequiresApproval: true));
     }
 
     /// <summary>

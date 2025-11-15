@@ -28,6 +28,7 @@ public sealed partial class PostgresSensorThingsRepository
         QueryOptions options,
         CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT
                 l.id::text,
@@ -44,7 +45,7 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE tl.thing_id = @ThingId::uuid
             """;
 
-        var locations = await _connection.QueryAsync<dynamic>(
+        var locations = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, new { ThingId = thingId }, cancellationToken: ct));
 
         var result = locations.Select(l => new StaLocation
@@ -65,12 +66,14 @@ public sealed partial class PostgresSensorThingsRepository
             Items = result
         };
     }
+    }
 
     public async Task<PagedResult<Datastream>> GetThingDatastreamsAsync(
         string thingId,
         QueryOptions options,
         CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT
                 id::text,
@@ -93,7 +96,7 @@ public sealed partial class PostgresSensorThingsRepository
             ORDER BY created_at DESC
             """;
 
-        var rows = await _connection.QueryAsync<dynamic>(
+        var rows = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, new { ThingId = thingId }, cancellationToken: ct));
 
         var datastreamsWithLinks = rows.Select(row =>
@@ -134,12 +137,14 @@ public sealed partial class PostgresSensorThingsRepository
             Items = datastreamsWithLinks
         };
     }
+    }
 
     public async Task<PagedResult<Observation>> GetDatastreamObservationsAsync(
         string datastreamId,
         QueryOptions options,
         CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sql = """
             SELECT
                 id::text,
@@ -170,7 +175,7 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var observations = await _connection.QueryAsync<Observation>(
+        var observations = await connection.QueryAsync<Observation>(
             new CommandDefinition(sql, new { DatastreamId = datastreamId }, cancellationToken: ct));
 
         // Generate self-links dynamically
@@ -181,9 +186,11 @@ public sealed partial class PostgresSensorThingsRepository
             Items = observationsWithLinks
         };
     }
+    }
 
     public async Task<PagedResult<Datastream>> GetSensorDatastreamsAsync(string sensorId, QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sqlBuilder = new StringBuilder("""
             SELECT
                 id::text,
@@ -234,7 +241,7 @@ public sealed partial class PostgresSensorThingsRepository
         parameters.Add("Limit", limit);
         parameters.Add("Offset", offset);
 
-        var results = await _connection.QueryAsync<dynamic>(
+        var results = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sqlBuilder.ToString(), parameters, cancellationToken: ct));
 
         var items = results.Select(r => new Datastream
@@ -274,12 +281,12 @@ public sealed partial class PostgresSensorThingsRepository
                 var countParams = new DynamicParameters();
                 countParams.Add("SensorId", sensorId);
                 countSql += " AND " + TranslateFilter(options.Filter, countParams);
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, countParams, cancellationToken: ct));
             }
             else
             {
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, new { SensorId = sensorId }, cancellationToken: ct));
             }
         }
@@ -290,9 +297,11 @@ public sealed partial class PostgresSensorThingsRepository
             TotalCount = totalCount
         };
     }
+    }
 
     public async Task<PagedResult<Datastream>> GetObservedPropertyDatastreamsAsync(string observedPropertyId, QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sqlBuilder = new StringBuilder("""
             SELECT
                 id::text,
@@ -343,7 +352,7 @@ public sealed partial class PostgresSensorThingsRepository
         parameters.Add("Limit", limit);
         parameters.Add("Offset", offset);
 
-        var results = await _connection.QueryAsync<dynamic>(
+        var results = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sqlBuilder.ToString(), parameters, cancellationToken: ct));
 
         var items = results.Select(r => new Datastream
@@ -383,12 +392,12 @@ public sealed partial class PostgresSensorThingsRepository
                 var countParams = new DynamicParameters();
                 countParams.Add("ObservedPropertyId", observedPropertyId);
                 countSql += " AND " + TranslateFilter(options.Filter, countParams);
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, countParams, cancellationToken: ct));
             }
             else
             {
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, new { ObservedPropertyId = observedPropertyId }, cancellationToken: ct));
             }
         }
@@ -398,5 +407,6 @@ public sealed partial class PostgresSensorThingsRepository
             Items = items,
             TotalCount = totalCount
         };
+    }
     }
 }

@@ -24,6 +24,7 @@ public sealed partial class PostgresSensorThingsRepository
 
     public async Task<Datastream?> GetDatastreamAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT
                 id::text,
@@ -46,7 +47,7 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE id = @Id::uuid
             """;
 
-        var result = await _connection.QuerySingleOrDefaultAsync<dynamic>(
+        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (result == null)
@@ -91,9 +92,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return datastream;
     }
+    }
 
     public async Task<PagedResult<Datastream>> GetDatastreamsAsync(QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sql = """
             SELECT
                 id::text,
@@ -136,7 +139,7 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var results = await _connection.QueryAsync<dynamic>(
+        var results = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -161,7 +164,7 @@ public sealed partial class PostgresSensorThingsRepository
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
@@ -178,9 +181,11 @@ public sealed partial class PostgresSensorThingsRepository
             NextLink = nextLink
         };
     }
+    }
 
     public async Task<Datastream> CreateDatastreamAsync(Datastream datastream, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO sta_datastreams (
                 name, description, observation_type, unit_of_measurement,
@@ -196,7 +201,7 @@ public sealed partial class PostgresSensorThingsRepository
                 properties, created_at, updated_at
             """;
 
-        var result = await _connection.QuerySingleAsync<dynamic>(
+        var result = await connection.QuerySingleAsync<dynamic>(
             new CommandDefinition(sql, new
             {
                 datastream.Name,
@@ -229,9 +234,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return created;
     }
+    }
 
     public async Task<Datastream> UpdateDatastreamAsync(string id, Datastream datastream, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             UPDATE sta_datastreams
             SET
@@ -247,7 +254,7 @@ public sealed partial class PostgresSensorThingsRepository
                 properties, created_at, updated_at
             """;
 
-        var result = await _connection.QuerySingleAsync<dynamic>(
+        var result = await connection.QuerySingleAsync<dynamic>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -278,14 +285,17 @@ public sealed partial class PostgresSensorThingsRepository
 
         return updated;
     }
+    }
 
     public async Task DeleteDatastreamAsync(string id, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = "DELETE FROM sta_datastreams WHERE id = @Id::uuid";
 
-        await _connection.ExecuteAsync(
+        await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted Datastream {DatastreamId}", id);
+    }
     }
 }

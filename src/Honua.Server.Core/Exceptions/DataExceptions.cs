@@ -9,11 +9,19 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public class DataException : HonuaException
 {
-    public DataException(string message) : base(message)
+    public DataException(string message) : base(message, ErrorCodes.DATA_OPERATION_FAILED)
     {
     }
 
-    public DataException(string message, Exception innerException) : base(message, innerException)
+    public DataException(string message, Exception innerException) : base(message, ErrorCodes.DATA_OPERATION_FAILED, innerException)
+    {
+    }
+
+    public DataException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public DataException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
     {
     }
 }
@@ -29,7 +37,7 @@ public sealed class FeatureNotFoundException : DataException
     public FeatureNotFoundException(string featureId, string? layerId = null)
         : base(layerId is null
             ? $"Feature '{featureId}' was not found."
-            : $"Feature '{featureId}' was not found in layer '{layerId}'.")
+            : $"Feature '{featureId}' was not found in layer '{layerId}'.", ErrorCodes.FEATURE_NOT_FOUND)
     {
         FeatureId = featureId;
         LayerId = layerId;
@@ -41,11 +49,11 @@ public sealed class FeatureNotFoundException : DataException
 /// </summary>
 public sealed class FeatureValidationException : DataException
 {
-    public FeatureValidationException(string message) : base(message)
+    public FeatureValidationException(string message) : base(message, ErrorCodes.FEATURE_VALIDATION_FAILED)
     {
     }
 
-    public FeatureValidationException(string message, Exception innerException) : base(message, innerException)
+    public FeatureValidationException(string message, Exception innerException) : base(message, ErrorCodes.FEATURE_VALIDATION_FAILED, innerException)
     {
     }
 }
@@ -57,17 +65,17 @@ public sealed class DataStoreProviderException : DataException
 {
     public string? ProviderName { get; }
 
-    public DataStoreProviderException(string message) : base(message)
+    public DataStoreProviderException(string message) : base(message, ErrorCodes.DATA_STORE_PROVIDER_ERROR)
     {
     }
 
     public DataStoreProviderException(string providerName, string message)
-        : base(message)
+        : base(message, ErrorCodes.DATA_STORE_PROVIDER_ERROR)
     {
         ProviderName = providerName;
     }
 
-    public DataStoreProviderException(string message, Exception innerException) : base(message, innerException)
+    public DataStoreProviderException(string message, Exception innerException) : base(message, ErrorCodes.DATA_STORE_PROVIDER_ERROR, innerException)
     {
     }
 }
@@ -79,12 +87,12 @@ public sealed class ConnectionStringException : DataException
 {
     public string? DataSourceId { get; }
 
-    public ConnectionStringException(string message) : base(message)
+    public ConnectionStringException(string message) : base(message, ErrorCodes.CONNECTION_STRING_INVALID)
     {
     }
 
     public ConnectionStringException(string dataSourceId, string message)
-        : base(message)
+        : base(message, ErrorCodes.CONNECTION_STRING_INVALID)
     {
         DataSourceId = dataSourceId;
     }
@@ -116,11 +124,11 @@ public sealed class ConcurrencyException : DataException
     /// </summary>
     public object? ActualVersion { get; }
 
-    public ConcurrencyException(string message) : base(message)
+    public ConcurrencyException(string message) : base(message, ErrorCodes.CONCURRENCY_CONFLICT)
     {
     }
 
-    public ConcurrencyException(string message, Exception innerException) : base(message, innerException)
+    public ConcurrencyException(string message, Exception innerException) : base(message, ErrorCodes.CONCURRENCY_CONFLICT, innerException)
     {
     }
 
@@ -129,7 +137,7 @@ public sealed class ConcurrencyException : DataException
         string entityType,
         object? expectedVersion,
         object? actualVersion)
-        : base($"Concurrency conflict for {entityType} '{entityId}'. The resource has been modified by another user. Expected version: {expectedVersion}, Actual version: {actualVersion}.")
+        : base($"Concurrency conflict for {entityType} '{entityId}'. The resource has been modified by another user. Expected version: {expectedVersion}, Actual version: {actualVersion}.", ErrorCodes.CONCURRENCY_CONFLICT)
     {
         EntityId = entityId;
         EntityType = entityType;
@@ -143,7 +151,7 @@ public sealed class ConcurrencyException : DataException
         object? expectedVersion,
         object? actualVersion,
         Exception innerException)
-        : base($"Concurrency conflict for {entityType} '{entityId}'. The resource has been modified by another user. Expected version: {expectedVersion}, Actual version: {actualVersion}.", innerException)
+        : base($"Concurrency conflict for {entityType} '{entityId}'. The resource has been modified by another user. Expected version: {expectedVersion}, Actual version: {actualVersion}.", ErrorCodes.CONCURRENCY_CONFLICT, innerException)
     {
         EntityId = entityId;
         EntityType = entityType;

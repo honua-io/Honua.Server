@@ -9,11 +9,19 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public class ServiceException : HonuaException
 {
-    public ServiceException(string message) : base(message)
+    public ServiceException(string message) : base(message, ErrorCodes.SERVICE_ERROR)
     {
     }
 
-    public ServiceException(string message, Exception innerException) : base(message, innerException)
+    public ServiceException(string message, Exception innerException) : base(message, ErrorCodes.SERVICE_ERROR, innerException)
+    {
+    }
+
+    public ServiceException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public ServiceException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
     {
     }
 }
@@ -28,13 +36,13 @@ public sealed class ServiceUnavailableException : ServiceException, ITransientEx
     public bool IsTransient => true;
 
     public ServiceUnavailableException(string serviceName, string message)
-        : base($"Service '{serviceName}' is unavailable: {message}")
+        : base($"Service '{serviceName}' is unavailable: {message}", ErrorCodes.SERVICE_UNAVAILABLE)
     {
         ServiceName = serviceName;
     }
 
     public ServiceUnavailableException(string serviceName, string message, Exception innerException)
-        : base($"Service '{serviceName}' is unavailable: {message}", innerException)
+        : base($"Service '{serviceName}' is unavailable: {message}", ErrorCodes.SERVICE_UNAVAILABLE, innerException)
     {
         ServiceName = serviceName;
     }
@@ -51,7 +59,7 @@ public sealed class CircuitBreakerOpenException : ServiceException, ITransientEx
     public bool IsTransient => true;
 
     public CircuitBreakerOpenException(string serviceName, TimeSpan breakDuration)
-        : base($"Circuit breaker for '{serviceName}' is open. Service temporarily unavailable for {breakDuration.TotalSeconds}s.")
+        : base($"Circuit breaker for '{serviceName}' is open. Service temporarily unavailable for {breakDuration.TotalSeconds}s.", ErrorCodes.CIRCUIT_BREAKER_OPEN)
     {
         ServiceName = serviceName;
         BreakDuration = breakDuration;
@@ -68,14 +76,14 @@ public sealed class ServiceTimeoutException : ServiceException, ITransientExcept
     public bool IsTransient => true;
 
     public ServiceTimeoutException(string serviceName, TimeSpan timeout)
-        : base($"Service '{serviceName}' timed out after {timeout.TotalSeconds}s.")
+        : base($"Service '{serviceName}' timed out after {timeout.TotalSeconds}s.", ErrorCodes.SERVICE_TIMEOUT)
     {
         ServiceName = serviceName;
         Timeout = timeout;
     }
 
     public ServiceTimeoutException(string serviceName, TimeSpan timeout, Exception innerException)
-        : base($"Service '{serviceName}' timed out after {timeout.TotalSeconds}s.", innerException)
+        : base($"Service '{serviceName}' timed out after {timeout.TotalSeconds}s.", ErrorCodes.SERVICE_TIMEOUT, innerException)
     {
         ServiceName = serviceName;
         Timeout = timeout;
@@ -92,7 +100,7 @@ public sealed class ServiceThrottledException : ServiceException, ITransientExce
     public bool IsTransient => true;
 
     public ServiceThrottledException(string serviceName, TimeSpan? retryAfter = null)
-        : base($"Service '{serviceName}' is throttled. {(retryAfter.HasValue ? $"Retry after {retryAfter.Value.TotalSeconds}s." : "")}")
+        : base($"Service '{serviceName}' is throttled. {(retryAfter.HasValue ? $"Retry after {retryAfter.Value.TotalSeconds}s." : "")}", ErrorCodes.SERVICE_THROTTLED)
     {
         ServiceName = serviceName;
         RetryAfter = retryAfter;

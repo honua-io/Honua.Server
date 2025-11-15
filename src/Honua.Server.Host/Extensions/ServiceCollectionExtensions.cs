@@ -7,6 +7,7 @@ using Honua.Server.Core.Security;
 using Honua.Server.Host.Carto;
 using Honua.Server.Host.Configuration;
 using Honua.Server.Host.Filters;
+using Honua.Server.Host.GeoservicesREST.Filters;
 using Honua.Server.Host.GeoservicesREST.Services;
 using Honua.Server.Host.Hosting;
 using Honua.Server.Host.Middleware;
@@ -547,6 +548,9 @@ public static class ServiceCollectionExtensions
         // Register export and attachment services (refactored from controller)
         services.AddScoped<IGeoservicesExportService, GeoservicesExportService>();
         services.AddScoped<IGeoservicesAttachmentService, GeoservicesAttachmentService>();
+
+        // Register geometry operation exception filter for consistent error handling
+        services.AddScoped<GeometryOperationExceptionFilter>();
 
         return services;
     }
