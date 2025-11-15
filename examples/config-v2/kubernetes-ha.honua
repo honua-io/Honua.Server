@@ -1,0 +1,194 @@
+# Kubernetes/Production Configuration with Leader Election
+# Example: Production deployment with multiple replicas
+
+honua {
+  version     = "1.0"
+  environment = "production"
+  log_level   = "warning"
+
+  # Production high availability settings
+  high_availability {
+    enabled = true
+
+    leader_election {
+      enabled                  = true
+      resource_name            = "honua-server-prod"
+      lease_duration_seconds   = 30
+      renewal_interval_seconds = 10
+      key_prefix               = "honua:prod:leader:"
+      enable_detailed_logging  = false  # Disable in production
+    }
+  }
+
+  # Security settings
+  cors {
+    allow_any_origin = false
+    allowed_origins  = env("ALLOWED_ORIGINS")  # Comma-separated list
+  }
+
+  security {
+    require_https = true
+    hsts_enabled  = true
+  }
+}
+
+# Production PostgreSQL with connection pooling
+data_source "postgres_prod" {
+  provider   = "postgresql"
+  connection = env("DATABASE_URL")  # Azure/AWS PostgreSQL connection string
+
+  pool {
+    min_size            = 10
+    max_size            = 100
+    connection_lifetime = 300  # 5 minutes
+  }
+
+  health_check = "SELECT 1"
+
+  # Connection retry for resilience
+  retry {
+    max_attempts = 3
+    delay_seconds = 2
+  }
+}
+
+# Production Redis with Sentinel for HA
+cache "redis_prod" {
+  enabled    = true
+  connection = env("REDIS_CONNECTION_STRING")  # Redis Sentinel connection
+  prefix     = "prod:"
+  ttl        = 3600  # 1 hour
+
+  # Redis Sentinel example:
+  # REDIS_CONNECTION_STRING=sentinel1:26379,sentinel2:26379,sentinel3:26379,serviceName=mymaster,password=xxx,ssl=true
+}
+
+# Production services
+service "ogc_api" {
+  enabled     = true
+  conformance = ["core", "geojson", "crs", "html", "oas30"]
+
+  # Rate limiting per user
+  rate_limit {
+    enabled  = true
+    requests = 1000
+    window   = "1m"
+  }
+}
+
+service "wfs" {
+  enabled = true
+  version = "2.0.0"
+
+  rate_limit {
+    enabled  = true
+    requests = 500
+    window   = "1m"
+  }
+}
+
+# Production layer with caching
+layer "production_features" {
+  title             = "Production Features"
+  description       = "Production feature dataset"
+  data_source       = data_source.postgres_prod
+  table             = "public.features"
+  id_field          = "fid"
+  display_field     = "name"
+  introspect_fields = false  # Explicitly define fields in production
+
+  geometry {
+    column = "geom"
+    type   = "Geometry"  # Multi-geometry support
+    srid   = 4326
+  }
+
+  # Field definitions (explicit in production)
+  fields = [
+    {
+      name = "fid"
+      type = "integer"
+    },
+    {
+      name = "name"
+      type = "string"
+    },
+    {
+      name = "category"
+      type = "string"
+    },
+    {
+      name = "created_at"
+      type = "datetime"
+    }
+  ]
+
+  services = [
+    service.ogc_api,
+    service.wfs
+  ]
+
+  # Enable caching for read-heavy production workloads
+  cache {
+    enabled = true
+    ttl     = 300  # 5 minutes
+  }
+}
+
+# Global rate limiting
+rate_limit {
+  enabled = true
+  store   = "redis"  # Use Redis for distributed rate limiting
+
+  rules = {
+    # Anonymous users
+    default = {
+      requests = 100
+      window   = "1m"
+    }
+
+    # Authenticated users
+    authenticated = {
+      requests = 1000
+      window   = "1m"
+    }
+
+    # Premium users
+    premium = {
+      requests = 10000
+      window   = "1m"
+    }
+  }
+}
+
+# Observability settings
+observability {
+  metrics {
+    enabled   = true
+    exporter  = "prometheus"
+    endpoint  = "/metrics"
+  }
+
+  tracing {
+    enabled   = true
+    exporter  = "otlp"
+    endpoint  = env("OTLP_ENDPOINT")
+    sample_rate = 0.1  # Sample 10% in production
+  }
+}
+
+# Production logging
+logging {
+  level = "warning"
+
+  # Structured JSON logging for production
+  format = "json"
+
+  # Log only errors for high-traffic components
+  overrides {
+    "Microsoft"                       = "error"
+    "Microsoft.Hosting.Lifetime"      = "information"
+    "Honua.Server.Core.Coordination"  = "information"  # Track leader election
+    "Honua.Server.Intake"              = "information"  # Track background jobs
+  }
+}
