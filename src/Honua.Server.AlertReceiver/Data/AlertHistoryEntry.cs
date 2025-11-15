@@ -41,6 +41,14 @@ public sealed class AlertHistoryEntry
 
     public string? SuppressionReason { get; set; }
 
+    public AlertDeliveryStatus DeliveryStatus { get; set; } = AlertDeliveryStatus.Pending;
+
+    public string[] FailedChannels { get; set; } = Array.Empty<string>();
+
+    public int RetryCount { get; set; }
+
+    public DateTimeOffset? LastRetryAttempt { get; set; }
+
     internal static AlertHistoryEntry FromRecord(AlertHistoryRecord record)
     {
         return new AlertHistoryEntry
@@ -61,6 +69,10 @@ public sealed class AlertHistoryEntry
             PublishedTo = Deserialize<string[]>(record.PublishedToJson) ?? Array.Empty<string>(),
             WasSuppressed = record.WasSuppressed,
             SuppressionReason = record.SuppressionReason,
+            DeliveryStatus = Enum.TryParse<AlertDeliveryStatus>(record.DeliveryStatus, out var status) ? status : AlertDeliveryStatus.Pending,
+            FailedChannels = Deserialize<string[]>(record.FailedChannelsJson) ?? Array.Empty<string>(),
+            RetryCount = record.RetryCount,
+            LastRetryAttempt = record.LastRetryAttempt,
         };
     }
 
@@ -84,6 +96,10 @@ public sealed class AlertHistoryEntry
             PublishedToJson = this.PublishedTo.Length > 0 ? JsonSerializer.Serialize(this.PublishedTo) : "[]",
             WasSuppressed = this.WasSuppressed,
             SuppressionReason = this.SuppressionReason,
+            DeliveryStatus = this.DeliveryStatus.ToString(),
+            FailedChannelsJson = this.FailedChannels.Length > 0 ? JsonSerializer.Serialize(this.FailedChannels) : "[]",
+            RetryCount = this.RetryCount,
+            LastRetryAttempt = this.LastRetryAttempt,
         };
     }
 

@@ -26,6 +26,12 @@ public sealed class HonuaAuthenticationOptions
 
     public BootstrapOptions Bootstrap { get; set; } = new();
 
+    public OidcProviderOptions Oidc { get; set; } = new();
+
+    public AzureAdOptions AzureAd { get; set; } = new();
+
+    public GoogleOptions Google { get; set; } = new();
+
     public enum AuthenticationMode
     {
         QuickStart,
@@ -158,14 +164,69 @@ public sealed class HonuaAuthenticationOptionsValidator : IValidateOptions<Honua
         switch (options.Mode)
         {
             case HonuaAuthenticationOptions.AuthenticationMode.Oidc:
-                if (options.Jwt.Authority.IsNullOrWhiteSpace())
+                // Check if at least one OIDC provider is enabled
+                var hasEnabledProvider = options.Oidc.Enabled || options.AzureAd.Enabled || options.Google.Enabled;
+                if (!hasEnabledProvider)
                 {
-                    failures.Add("Jwt Authority must be provided when authentication mode is Oidc.");
+                    failures.Add("At least one OIDC provider must be enabled when authentication mode is Oidc. Enable Oidc, AzureAd, or Google provider.");
                 }
 
-                if (options.Jwt.Audience.IsNullOrWhiteSpace())
+                // Validate generic OIDC provider
+                if (options.Oidc.Enabled)
                 {
-                    failures.Add("Jwt Audience must be provided when authentication mode is Oidc.");
+                    if (options.Oidc.Authority.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("Oidc.Authority is required when Oidc provider is enabled.");
+                    }
+                    if (options.Oidc.ClientId.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("Oidc.ClientId is required when Oidc provider is enabled.");
+                    }
+                    if (options.Oidc.ClientSecret.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("Oidc.ClientSecret is required when Oidc provider is enabled.");
+                    }
+                }
+
+                // Validate Azure AD provider
+                if (options.AzureAd.Enabled)
+                {
+                    if (options.AzureAd.TenantId.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("AzureAd.TenantId is required when Azure AD provider is enabled.");
+                    }
+                    if (options.AzureAd.ClientId.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("AzureAd.ClientId is required when Azure AD provider is enabled.");
+                    }
+                    if (options.AzureAd.ClientSecret.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("AzureAd.ClientSecret is required when Azure AD provider is enabled.");
+                    }
+                }
+
+                // Validate Google provider
+                if (options.Google.Enabled)
+                {
+                    if (options.Google.ClientId.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("Google.ClientId is required when Google provider is enabled.");
+                    }
+                    if (options.Google.ClientSecret.IsNullOrWhiteSpace())
+                    {
+                        failures.Add("Google.ClientSecret is required when Google provider is enabled.");
+                    }
+                }
+
+                // Legacy JWT-only validation (for backward compatibility)
+                if (!hasEnabledProvider && options.Jwt.Authority.IsNullOrWhiteSpace())
+                {
+                    failures.Add("Jwt Authority must be provided when authentication mode is Oidc and no OIDC providers are enabled.");
+                }
+
+                if (!hasEnabledProvider && options.Jwt.Audience.IsNullOrWhiteSpace())
+                {
+                    failures.Add("Jwt Audience must be provided when authentication mode is Oidc and no OIDC providers are enabled.");
                 }
 
                 break;

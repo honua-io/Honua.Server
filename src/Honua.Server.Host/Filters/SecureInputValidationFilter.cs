@@ -73,7 +73,27 @@ public sealed class SecureInputValidationFilter : IAsyncActionFilter
                 MaxRequestSize,
                 requestId);
 
-            context.Result = new StatusCodeResult(StatusCodes.Status413PayloadTooLarge);
+            // Add Retry-After header per Microsoft REST API Guidelines
+            context.HttpContext.Response.Headers["Retry-After"] = "3600";
+
+            // Return RFC 7807 ProblemDetails for consistent error format
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status413PayloadTooLarge,
+                Title = "Payload Too Large",
+                Detail = $"Request size exceeds maximum allowed size of {MaxRequestSize / 1_000_000} MB",
+                Type = "https://tools.ietf.org/html/rfc7231#section-6.5.11",
+                Instance = requestId
+            };
+
+            // Add requestId to extensions for correlation
+            problemDetails.Extensions["requestId"] = requestId;
+            problemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+
+            context.Result = new ObjectResult(problemDetails)
+            {
+                StatusCode = StatusCodes.Status413PayloadTooLarge
+            };
             return;
         }
 

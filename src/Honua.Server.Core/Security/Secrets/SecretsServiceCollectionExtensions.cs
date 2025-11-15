@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Security.Secrets;
 
@@ -72,8 +71,8 @@ public static class SecretsServiceCollectionExtensions
             new Microsoft.Extensions.Caching.Memory.MemoryCache(
                 new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()));
 
-        var logger = services.BuildServiceProvider().GetRequiredService<ILogger<SecretsConfiguration>>();
-        logger.LogInformation("Registered secrets provider: {Provider}", providerName);
+        // Note: Registered secrets provider - removed BuildServiceProvider() call to prevent memory leaks
+        // Provider selection can be verified through configuration inspection or runtime logging
 
         return services;
     }

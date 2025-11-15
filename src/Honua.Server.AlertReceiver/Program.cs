@@ -11,7 +11,10 @@ using Honua.Server.AlertReceiver.Middleware;
 using Honua.Server.AlertReceiver.Security;
 using Honua.Server.AlertReceiver.Services;
 using Honua.Server.Core.Extensions;
+using Honua.Server.Observability;
+using Honua.Server.Observability.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -25,6 +28,53 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+// Add OpenTelemetry Logging (from Honua.Server.Observability)
+var loggingExporter = builder.Configuration["observability:logging:exporter"]?.ToLowerInvariant();
+if (loggingExporter == "otlp" || loggingExporter == "console")
+{
+    builder.Logging.AddOpenTelemetryLogging(
+        builder.Configuration,
+        serviceName: "Honua.Server.AlertReceiver",
+        serviceVersion: GetServiceVersion());
+}
+
+// Add comprehensive observability services from Honua.Server.Observability
+// This includes OpenTelemetry with metrics, tracing, health checks, and resource attributes
+builder.Services.AddHonuaObservability(
+    serviceName: "Honua.Server.AlertReceiver",
+    serviceVersion: GetServiceVersion(),
+    connectionString: null, // AlertReceiver uses its own connection string
+    configureTracing: tb =>
+    {
+        // Add AlertReceiver-specific activity sources
+        tb.AddSource("Honua.Server.Alerts");
+        tb.AddSource("Honua.Server.AlertPublishing");
+
+        // Add OTLP exporter if configured
+        var exporterType = builder.Configuration["observability:tracing:exporter"]?.ToLowerInvariant();
+        if (exporterType == "otlp")
+        {
+            tb.AddOtlpExporter(options =>
+            {
+                var endpoint = builder.Configuration["observability:tracing:otlpEndpoint"];
+                if (!string.IsNullOrEmpty(endpoint))
+                {
+                    options.Endpoint = new Uri(endpoint);
+                }
+                var headers = builder.Configuration["observability:tracing:otlpHeaders"];
+                if (!string.IsNullOrWhiteSpace(headers))
+                {
+                    options.Headers = headers;
+                }
+            });
+        }
+        else if (exporterType == "console")
+        {
+            tb.AddConsoleExporter();
+        }
+    },
+    configuration: builder.Configuration);
 
 // Add services
 builder.Services.AddControllers();
@@ -141,6 +191,24 @@ builder.Services.AddScoped<IAlertSilencingService, AlertSilencingService>();
 builder.Services.AddSingleton<IAlertMetricsService, AlertMetricsService>();
 builder.Services.AddHostedService<AlertHistoryStartupInitializer>();
 
+// Add Dead Letter Queue services for failed alert deliveries
+builder.Services.AddSingleton<IAlertDeadLetterQueueService, AlertDeadLetterQueueService>();
+builder.Services.AddHostedService<AlertRetryWorkerService>();
+Log.Information("Alert Dead Letter Queue services registered for resilient delivery");
+
+// Add Alert Recovery Service for durable queue pattern
+builder.Services.AddHostedService<AlertRecoveryService>();
+Log.Information("Alert Recovery Service registered for recovering pending alerts on restart");
+
+// Add Alert Escalation services
+builder.Services.Configure<AlertEscalationOptions>(builder.Configuration.GetSection("AlertEscalation"));
+builder.Services.AddSingleton<IAlertEscalationStore, AlertEscalationStore>();
+builder.Services.AddScoped<IAlertEscalationService, AlertEscalationService>();
+builder.Services.AddHostedService<AlertEscalationStartupInitializer>();
+builder.Services.AddHostedService<AlertEscalationWorkerService>();
+Log.Information("Alert Escalation services registered for multi-level alert escalation");
+
+
 // Configure HTTP clients
 builder.Services.AddHttpClient("PagerDuty");
 builder.Services.AddHttpClient("Slack");
@@ -165,13 +233,14 @@ builder.Services.AddSingleton<IAlertPublisher>(sp =>
     var compositeLogger = sp.GetRequiredService<ILogger<CompositeAlertPublisher>>();
     var retryLogger = sp.GetRequiredService<ILogger<RetryAlertPublisher>>();
     var cbLogger = sp.GetRequiredService<ILogger<CircuitBreakerAlertPublisher>>();
+    var dlqService = sp.GetRequiredService<IAlertDeadLetterQueueService>();
     var publishers = new List<IAlertPublisher>();
 
-    // Helper to wrap publisher with retry + circuit breaker
+    // Helper to wrap publisher with retry + circuit breaker + DLQ
     IAlertPublisher WrapPublisher(IAlertPublisher publisher)
     {
-        // Apply retry first (inner)
-        var withRetry = new RetryAlertPublisher(publisher, config, retryLogger);
+        // Apply retry first (inner) with DLQ support
+        var withRetry = new RetryAlertPublisher(publisher, config, retryLogger, dlqService);
         // Then circuit breaker (outer)
         return new CircuitBreakerAlertPublisher(withRetry, config, cbLogger);
     }
@@ -376,13 +445,26 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();
 
+// Add observability middleware (correlation ID, metrics) from Honua.Server.Observability
+app.UseHonuaMetrics();
+
 // Apply webhook signature validation to webhook endpoints only
 app.UseWebhookSignatureValidation(new PathString("/api/alerts/webhook"));
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapHealthChecks("/health");
+
+// Map health check endpoints with RFC-compliant format using Honua.Server.Observability extensions
+app.UseHonuaHealthChecks();
+
+// Add Prometheus metrics endpoint if enabled
+var metricsEnabled = app.Configuration.GetValue<bool>("observability:metrics:enabled");
+if (metricsEnabled)
+{
+    app.UsePrometheusMetrics();
+    Log.Information("Prometheus metrics endpoint enabled at /metrics");
+}
 
 app.Run();
 
@@ -490,6 +572,14 @@ static (bool IsValid, string? Reason) ValidateKeyEntropy(string key)
 
     // All entropy checks passed
     return (true, null);
+}
+
+static string GetServiceVersion()
+{
+    var assembly = System.Reflection.Assembly.GetEntryAssembly();
+    return assembly?.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+           ?? assembly?.GetName().Version?.ToString()
+           ?? "1.0.0";
 }
 
 internal sealed record JwtSigningKeyOption

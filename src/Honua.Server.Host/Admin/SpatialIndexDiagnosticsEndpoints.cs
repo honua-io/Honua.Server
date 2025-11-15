@@ -178,6 +178,10 @@ public class SpatialIndexDiagnosticsService
             GeneratedAt = DateTime.UtcNow
         };
 
+        // PERFORMANCE FIX: Create dictionary lookup to avoid N+1 query pattern
+        // Previously used FirstOrDefault in loop (O(n*m)), now using dictionary (O(1) lookups)
+        var dataSourceDict = snapshot.DataSources.ToDictionary(ds => ds.Id, StringComparer.OrdinalIgnoreCase);
+
         // Group layers by data source
         var layersByDataSource = snapshot.Layers
             .Join(snapshot.Services,
@@ -188,8 +192,7 @@ public class SpatialIndexDiagnosticsService
 
         foreach (var group in layersByDataSource)
         {
-            var dataSource = snapshot.DataSources.FirstOrDefault(ds => ds.Id == group.Key);
-            if (dataSource == null)
+            if (!dataSourceDict.TryGetValue(group.Key, out var dataSource))
             {
                 this.logger.LogWarning("Data source '{DataSourceId}' not found", group.Key);
                 continue;

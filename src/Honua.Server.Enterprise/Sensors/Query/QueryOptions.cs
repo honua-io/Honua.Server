@@ -27,8 +27,16 @@ public sealed record QueryOptions
     /// <summary>
     /// Number of entities to skip ($skip).
     /// Used for pagination.
+    /// NOTE: For large offsets (>1000), use Cursor instead for better performance.
     /// </summary>
     public int? Skip { get; init; } = 0;
+
+    /// <summary>
+    /// Cursor for pagination (phenomenon_time in ISO 8601 format).
+    /// More efficient than Skip for large datasets.
+    /// Format: ISO 8601 timestamp (e.g., "2024-11-14T10:30:00Z")
+    /// </summary>
+    public string? Cursor { get; init; }
 
     /// <summary>
     /// Whether to include the total count in the response ($count).

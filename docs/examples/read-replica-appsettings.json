@@ -1,0 +1,30 @@
+{
+  "ReadReplica": {
+    "EnableReadReplicaRouting": true,
+    "FallbackToPrimary": true,
+    "HealthCheckIntervalSeconds": 30,
+    "MaxConsecutiveFailures": 3,
+    "UnhealthyRetryIntervalSeconds": 60,
+    "MaxReplicationLagSeconds": null,
+    "EnableDetailedLogging": false,
+    "ReadReplicaOperations": [
+      "Features",
+      "Observations",
+      "Tiles",
+      "Statistics"
+    ]
+  },
+  "ConnectionStrings": {
+    "Primary": "Host=primary.example.com;Port=5432;Database=honua;Username=honua_app;Password=<primary_password>",
+    "Replica1": "Host=replica1.example.com;Port=5432;Database=honua;Username=honua_readonly;Password=<replica_password>",
+    "Replica2": "Host=replica2.example.com;Port=5432;Database=honua;Username=honua_readonly;Password=<replica_password>",
+    "Replica3": "Host=replica3-us-west.example.com;Port=5432;Database=honua;Username=honua_readonly;Password=<replica_password>"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Honua.Server.Core.Data.ReadReplicaRouter": "Debug",
+      "Honua.Server.Core.Data.ReadReplicaHealthCheck": "Debug"
+    }
+  }
+}

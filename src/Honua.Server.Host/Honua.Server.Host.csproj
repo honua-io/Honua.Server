@@ -136,6 +136,12 @@
     <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
   </ItemGroup>
   <ItemGroup>
+    <!-- OAuth 2.0 and OpenID Connect Authentication -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.1" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.3.1" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Health Checks -->
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="9.0.9" />
     <PackageReference Include="AspNetCore.HealthChecks.UI" Version="9.0.0" />

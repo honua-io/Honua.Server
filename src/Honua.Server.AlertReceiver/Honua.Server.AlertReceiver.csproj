@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Honua.Server.Core\Honua.Server.Core.csproj" />
+    <ProjectReference Include="..\Honua.Server.Observability\Honua.Server.Observability.csproj" />
   </ItemGroup>
 
 </Project>

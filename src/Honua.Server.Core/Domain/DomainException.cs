@@ -12,7 +12,7 @@ public class DomainException : Exception
     /// <summary>
     /// Gets the error code associated with this domain exception.
     /// </summary>
-    public string? ErrorCode { get; }
+    public string? ErrorCode { get; private set; }
 
     /// <summary>
     /// Gets additional context or metadata associated with this exception.
@@ -24,6 +24,7 @@ public class DomainException : Exception
     /// </summary>
     public DomainException()
     {
+        ErrorCode = Exceptions.ErrorCodes.DOMAIN_RULE_VIOLATION;
     }
 
     /// <summary>
@@ -33,6 +34,7 @@ public class DomainException : Exception
     public DomainException(string message)
         : base(message)
     {
+        ErrorCode = Exceptions.ErrorCodes.DOMAIN_RULE_VIOLATION;
     }
 
     /// <summary>
@@ -44,6 +46,7 @@ public class DomainException : Exception
     public DomainException(string message, Exception innerException)
         : base(message, innerException)
     {
+        ErrorCode = Exceptions.ErrorCodes.DOMAIN_RULE_VIOLATION;
     }
 
     /// <summary>

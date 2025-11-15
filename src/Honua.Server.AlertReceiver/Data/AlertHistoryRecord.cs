@@ -38,4 +38,12 @@ internal sealed class AlertHistoryRecord
     public bool WasSuppressed { get; set; }
 
     public string? SuppressionReason { get; set; }
+
+    public string DeliveryStatus { get; set; } = "Pending";
+
+    public string? FailedChannelsJson { get; set; }
+
+    public int RetryCount { get; set; }
+
+    public DateTimeOffset? LastRetryAttempt { get; set; }
 }

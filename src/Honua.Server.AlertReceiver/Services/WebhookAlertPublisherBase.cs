@@ -128,6 +128,23 @@ public abstract class WebhookAlertPublisherBase : IAlertPublisher
         }
     }
 
+    public virtual async Task<AlertDeliveryResult> PublishWithResultAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
+    {
+        var result = new AlertDeliveryResult();
+        try
+        {
+            await this.PublishAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
+            result.SuccessfulChannels.Add(this.ServiceName);
+        }
+        catch (Exception)
+        {
+            result.FailedChannels.Add(this.ServiceName);
+            throw;
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Build the service-specific payload for the alert.
     /// </summary>

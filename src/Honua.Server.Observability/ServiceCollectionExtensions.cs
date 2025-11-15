@@ -4,9 +4,12 @@ using Honua.Server.Observability.HealthChecks;
 using Honua.Server.Observability.Metrics;
 using Honua.Server.Observability.Middleware;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -29,28 +32,19 @@ public static class ServiceCollectionExtensions
     /// <param name="serviceVersion">Service version for telemetry</param>
     /// <param name="connectionString">Database connection string for health checks</param>
     /// <param name="configureTracing">Optional action to configure tracing</param>
+    /// <param name="configuration">Optional configuration for advanced features</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddHonuaObservability(
         this IServiceCollection services,
         string serviceName = "Honua.Server",
         string serviceVersion = "1.0.0",
         string? connectionString = null,
-        Action<TracerProviderBuilder>? configureTracing = null)
+        Action<TracerProviderBuilder>? configureTracing = null,
+        IConfiguration? configuration = null)
     {
         // Add OpenTelemetry with comprehensive instrumentation
         services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource
-                .AddService(serviceName: serviceName, serviceVersion: serviceVersion)
-                .AddAttributes(new[]
-                {
-                    new KeyValuePair<string, object>("deployment.environment",
-                        Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"),
-                    new KeyValuePair<string, object>("host.name",
-                        Environment.MachineName),
-                    new KeyValuePair<string, object>("service.namespace", "Honua"),
-                    new KeyValuePair<string, object>("service.instance.id",
-                        Environment.GetEnvironmentVariable("HOSTNAME") ?? Environment.MachineName),
-                }))
+            .ConfigureResource(resource => ConfigureResourceAttributes(resource, serviceName, serviceVersion, configuration))
             .WithMetrics(builder =>
             {
                 builder
@@ -66,6 +60,7 @@ public static class ServiceCollectionExtensions
                     .AddRuntimeInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddAspNetCoreInstrumentation()
+                    .AddProcessInstrumentation()
 
                     // Add Prometheus exporter
                     .AddPrometheusExporter(options =>
@@ -73,6 +68,17 @@ public static class ServiceCollectionExtensions
                         options.ScrapeEndpointPath = "/metrics";
                         options.ScrapeResponseCacheDurationMilliseconds = 0;
                     });
+
+                // Configure histogram buckets following OpenTelemetry best practices
+                builder.AddView("http.server.request.duration", new ExplicitBucketHistogramConfiguration
+                {
+                    Boundaries = new[] { 0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000 }
+                });
+
+                builder.AddView("http.client.request.duration", new ExplicitBucketHistogramConfiguration
+                {
+                    Boundaries = new[] { 0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000 }
+                });
             })
             .WithTracing(builder =>
             {
@@ -253,20 +259,30 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Maps health check endpoints.
+    /// Maps health check endpoints with RFC-compliant response format.
     /// </summary>
     /// <param name="app">The application builder.</param>
     /// <returns>The application builder for chaining.</returns>
     public static IApplicationBuilder UseHonuaHealthChecks(this IApplicationBuilder app)
     {
-        app.UseHealthChecks("/health");
-        app.UseHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+        app.UseHealthChecks("/health", new HealthCheckOptions
         {
-            Predicate = _ => false // Liveness - always healthy if app is running
+            ResponseWriter = HealthCheckResponseWriter.WriteResponse,
+            AllowCachingResponses = false
         });
-        app.UseHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+
+        app.UseHealthChecks("/health/live", new HealthCheckOptions
         {
-            Predicate = check => check.Tags.Contains("database") || check.Tags.Contains("queue")
+            Predicate = _ => false, // Liveness - always healthy if app is running
+            ResponseWriter = HealthCheckResponseWriter.WriteResponse,
+            AllowCachingResponses = false
+        });
+
+        app.UseHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("database") || check.Tags.Contains("queue"),
+            ResponseWriter = HealthCheckResponseWriter.WriteResponse,
+            AllowCachingResponses = false
         });
 
         return app;
@@ -282,4 +298,266 @@ public static class ServiceCollectionExtensions
         app.UseOpenTelemetryPrometheusScrapingEndpoint();
         return app;
     }
+
+    /// <summary>
+    /// Adds OpenTelemetry logging with OTLP exporter support.
+    /// </summary>
+    /// <param name="builder">The logging builder.</param>
+    /// <param name="configuration">The application configuration.</param>
+    /// <param name="serviceName">Service name for telemetry.</param>
+    /// <param name="serviceVersion">Service version for telemetry.</param>
+    /// <returns>The logging builder for chaining.</returns>
+    public static ILoggingBuilder AddOpenTelemetryLogging(
+        this ILoggingBuilder builder,
+        IConfiguration configuration,
+        string serviceName = "Honua.Server",
+        string serviceVersion = "1.0.0")
+    {
+        builder.AddOpenTelemetry(options =>
+        {
+            // Configure resource attributes
+            options.SetResourceBuilder(
+                ResourceBuilder.CreateDefault()
+                    .AddService(serviceName: serviceName, serviceVersion: serviceVersion)
+                    .AddAttributes(GetResourceAttributes(serviceName, serviceVersion, configuration)));
+
+            // Include formatted message
+            options.IncludeFormattedMessage = true;
+
+            // Include scopes for better context
+            options.IncludeScopes = true;
+
+            // Parse state values for structured logging
+            options.ParseStateValues = true;
+
+            // Configure OTLP exporter if enabled
+            var otlpEndpoint = configuration?["observability:logging:otlpEndpoint"];
+            var exporterType = configuration?["observability:logging:exporter"]?.ToLowerInvariant();
+
+            switch (exporterType)
+            {
+                case "otlp":
+                    if (!string.IsNullOrWhiteSpace(otlpEndpoint))
+                    {
+                        options.AddOtlpExporter(otlpOptions =>
+                        {
+                            otlpOptions.Endpoint = new Uri(otlpEndpoint);
+
+                            var headers = configuration?["observability:logging:otlpHeaders"];
+                            if (!string.IsNullOrWhiteSpace(headers))
+                            {
+                                otlpOptions.Headers = headers;
+                            }
+                        });
+                    }
+                    break;
+
+                case "console":
+                    options.AddConsoleExporter();
+                    break;
+            }
+        });
+
+        return builder;
+    }
+
+    #region Private Helper Methods
+
+    private static ResourceBuilder ConfigureResourceAttributes(
+        ResourceBuilder builder,
+        string serviceName,
+        string serviceVersion,
+        IConfiguration? configuration)
+    {
+        builder.AddService(serviceName: serviceName, serviceVersion: serviceVersion);
+        builder.AddAttributes(GetResourceAttributes(serviceName, serviceVersion, configuration));
+        return builder;
+    }
+
+    private static IEnumerable<KeyValuePair<string, object>> GetResourceAttributes(
+        string serviceName,
+        string serviceVersion,
+        IConfiguration? configuration)
+    {
+        var attributes = new List<KeyValuePair<string, object>>
+        {
+            // Required semantic conventions
+            new("service.namespace", "Honua"),
+            new("service.instance.id", GetServiceInstanceId()),
+
+            // Deployment environment
+            new("deployment.environment", GetEnvironment(configuration)),
+
+            // Host semantic conventions
+            new("host.name", Environment.MachineName),
+            new("host.id", GetHostId()),
+
+            // Process semantic conventions
+            new("process.pid", Environment.ProcessId),
+            new("process.runtime.name", ".NET"),
+            new("process.runtime.version", Environment.Version.ToString()),
+            new("process.runtime.description", System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription),
+
+            // OS semantic conventions
+            new("os.type", GetOSType()),
+            new("os.description", System.Runtime.InteropServices.RuntimeInformation.OSDescription),
+
+            // Telemetry SDK
+            new("telemetry.sdk.name", "opentelemetry"),
+            new("telemetry.sdk.language", "dotnet"),
+        };
+
+        // Add cloud-specific attributes
+        AddCloudAttributes(attributes, configuration);
+
+        // Add Kubernetes attributes if available
+        AddKubernetesAttributes(attributes);
+
+        // Add container attributes if available
+        AddContainerAttributes(attributes);
+
+        return attributes;
+    }
+
+    private static string GetServiceInstanceId()
+    {
+        return Environment.GetEnvironmentVariable("SERVICE_INSTANCE_ID")
+               ?? Environment.GetEnvironmentVariable("HOSTNAME")
+               ?? Environment.GetEnvironmentVariable("COMPUTERNAME")
+               ?? $"{Environment.MachineName}-{Environment.ProcessId}";
+    }
+
+    private static string GetEnvironment(IConfiguration? configuration)
+    {
+        return configuration?["ASPNETCORE_ENVIRONMENT"]
+               ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+               ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+               ?? "Production";
+    }
+
+    private static string GetHostId()
+    {
+        return Environment.GetEnvironmentVariable("HOST_ID") ?? Environment.MachineName;
+    }
+
+    private static string GetOSType()
+    {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+            return "windows";
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+            return "linux";
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX))
+            return "darwin";
+        return "unknown";
+    }
+
+    private static void AddCloudAttributes(List<KeyValuePair<string, object>> attributes, IConfiguration? configuration)
+    {
+        var cloudProvider = configuration?["observability:cloudProvider"]?.ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(cloudProvider) || cloudProvider == "none")
+            return;
+
+        attributes.Add(new("cloud.provider", cloudProvider));
+
+        switch (cloudProvider)
+        {
+            case "aws":
+                AddAwsAttributes(attributes);
+                break;
+            case "azure":
+                AddAzureAttributes(attributes);
+                break;
+            case "gcp":
+                AddGcpAttributes(attributes);
+                break;
+        }
+    }
+
+    private static void AddAwsAttributes(List<KeyValuePair<string, object>> attributes)
+    {
+        var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? Environment.GetEnvironmentVariable("AWS_DEFAULT_REGION");
+        if (!string.IsNullOrWhiteSpace(region))
+            attributes.Add(new("cloud.region", region));
+
+        var accountId = Environment.GetEnvironmentVariable("AWS_ACCOUNT_ID");
+        if (!string.IsNullOrWhiteSpace(accountId))
+            attributes.Add(new("cloud.account.id", accountId));
+
+        var ecsMetadata = Environment.GetEnvironmentVariable("ECS_CONTAINER_METADATA_URI_V4");
+        if (!string.IsNullOrWhiteSpace(ecsMetadata))
+        {
+            attributes.Add(new("cloud.platform", "aws_ecs"));
+            var taskArn = Environment.GetEnvironmentVariable("ECS_TASK_ARN");
+            if (!string.IsNullOrWhiteSpace(taskArn))
+                attributes.Add(new("cloud.resource_id", taskArn));
+        }
+    }
+
+    private static void AddAzureAttributes(List<KeyValuePair<string, object>> attributes)
+    {
+        var region = Environment.GetEnvironmentVariable("AZURE_REGION") ?? Environment.GetEnvironmentVariable("REGION_NAME");
+        if (!string.IsNullOrWhiteSpace(region))
+            attributes.Add(new("cloud.region", region));
+
+        var websiteName = Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME");
+        if (!string.IsNullOrWhiteSpace(websiteName))
+        {
+            attributes.Add(new("cloud.platform", "azure_app_service"));
+            var instanceId = Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID");
+            if (!string.IsNullOrWhiteSpace(instanceId))
+                attributes.Add(new("service.instance.id", instanceId));
+        }
+    }
+
+    private static void AddGcpAttributes(List<KeyValuePair<string, object>> attributes)
+    {
+        var region = Environment.GetEnvironmentVariable("GCP_REGION") ?? Environment.GetEnvironmentVariable("GOOGLE_CLOUD_REGION");
+        if (!string.IsNullOrWhiteSpace(region))
+            attributes.Add(new("cloud.region", region));
+
+        var projectId = Environment.GetEnvironmentVariable("GCP_PROJECT") ?? Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
+        if (!string.IsNullOrWhiteSpace(projectId))
+            attributes.Add(new("cloud.account.id", projectId));
+
+        var serviceName = Environment.GetEnvironmentVariable("K_SERVICE");
+        if (!string.IsNullOrWhiteSpace(serviceName))
+        {
+            attributes.Add(new("cloud.platform", "gcp_cloud_run"));
+            var revision = Environment.GetEnvironmentVariable("K_REVISION");
+            if (!string.IsNullOrWhiteSpace(revision))
+                attributes.Add(new("service.instance.id", revision));
+        }
+    }
+
+    private static void AddKubernetesAttributes(List<KeyValuePair<string, object>> attributes)
+    {
+        var podName = Environment.GetEnvironmentVariable("KUBERNETES_POD_NAME");
+        var namespace_ = Environment.GetEnvironmentVariable("KUBERNETES_NAMESPACE");
+
+        if (!string.IsNullOrWhiteSpace(namespace_))
+            attributes.Add(new("k8s.namespace.name", namespace_));
+
+        if (!string.IsNullOrWhiteSpace(podName))
+            attributes.Add(new("k8s.pod.name", podName));
+
+        var clusterName = Environment.GetEnvironmentVariable("KUBERNETES_CLUSTER_NAME");
+        if (!string.IsNullOrWhiteSpace(clusterName))
+            attributes.Add(new("k8s.cluster.name", clusterName));
+    }
+
+    private static void AddContainerAttributes(List<KeyValuePair<string, object>> attributes)
+    {
+        if (File.Exists("/.dockerenv"))
+        {
+            var containerId = Environment.GetEnvironmentVariable("HOSTNAME");
+            if (!string.IsNullOrWhiteSpace(containerId))
+                attributes.Add(new("container.id", containerId));
+        }
+
+        var containerName = Environment.GetEnvironmentVariable("CONTAINER_NAME");
+        if (!string.IsNullOrWhiteSpace(containerName))
+            attributes.Add(new("container.name", containerName));
+    }
+
+    #endregion
 }

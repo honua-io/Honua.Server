@@ -483,7 +483,7 @@ internal static class WebApplicationExtensions
         // Returns detailed status of all health checks
         app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
-            ResponseWriter = WriteDetailedHealthCheckResponse,
+            ResponseWriter = Honua.Server.Observability.HealthChecks.HealthCheckResponseWriter.WriteResponse,
             AllowCachingResponses = false
         });
 
@@ -493,7 +493,7 @@ internal static class WebApplicationExtensions
         app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("ready"),
-            ResponseWriter = WriteDetailedHealthCheckResponse,
+            ResponseWriter = Honua.Server.Observability.HealthChecks.HealthCheckResponseWriter.WriteResponse,
             AllowCachingResponses = false
         });
 
@@ -503,7 +503,7 @@ internal static class WebApplicationExtensions
         app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             Predicate = _ => false, // No checks - just returns 200 if app is running
-            ResponseWriter = WriteSimpleHealthCheckResponse,
+            ResponseWriter = Honua.Server.Observability.HealthChecks.HealthCheckResponseWriter.WriteResponse,
             AllowCachingResponses = false
         });
 
@@ -527,52 +527,7 @@ internal static class WebApplicationExtensions
         return app;
     }
 
-    /// <summary>
-    /// Writes a detailed health check response with diagnostic data.
-    /// </summary>
-    private static Task WriteDetailedHealthCheckResponse(
-        HttpContext context,
-        Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
-    {
-        context.Response.ContentType = "application/json";
-
-        var result = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            totalDuration = report.TotalDuration.TotalMilliseconds,
-            entries = report.Entries.Select(e => new
-            {
-                name = e.Key,
-                status = e.Value.Status.ToString(),
-                duration = e.Value.Duration.TotalMilliseconds,
-                description = e.Value.Description,
-                data = e.Value.Data,
-                tags = e.Value.Tags
-            })
-        }, new System.Text.Json.JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-
-        return context.Response.WriteAsync(result);
-    }
-
-    /// <summary>
-    /// Writes a simple health check response without detailed diagnostic data.
-    /// Used when EnableDetailedErrors is false (typically in production).
-    /// </summary>
-    private static Task WriteSimpleHealthCheckResponse(
-        HttpContext context,
-        Microsoft.Extensions.Diagnostics.HealthChecks.HealthReport report)
-    {
-        context.Response.ContentType = "application/json";
-
-        var result = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            totalDuration = report.TotalDuration.TotalMilliseconds
-        });
-
-        return context.Response.WriteAsync(result);
-    }
+    // Health check response writers have been moved to Honua.Server.Observability.HealthChecks.HealthCheckResponseWriter
+    // This provides RFC-compliant health check responses following the IETF Health Check Response Format for HTTP APIs
+    // See: https://datatracker.ietf.org/doc/html/draft-inadarei-api-health-check-06
 }

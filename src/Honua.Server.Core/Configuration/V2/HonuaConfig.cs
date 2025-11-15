@@ -134,6 +134,18 @@ public sealed record class DataSourceBlock
     /// Connection pool settings.
     /// </summary>
     public PoolSettings? Pool { get; init; }
+
+    /// <summary>
+    /// Indicates whether this data source is read-only (e.g., read replica).
+    /// Read-only data sources are used for query operations but not for writes.
+    /// </summary>
+    public bool ReadOnly { get; init; } = false;
+
+    /// <summary>
+    /// Maximum replication lag in seconds for read replicas.
+    /// If specified, this replica will be skipped if lag exceeds this threshold.
+    /// </summary>
+    public int? MaxReplicationLag { get; init; }
 }
 
 /// <summary>

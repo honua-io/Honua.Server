@@ -20,16 +20,19 @@ public sealed class AlertHistoryController : ControllerBase
 {
     private readonly IAlertPersistenceService persistenceService;
     private readonly IAlertSilencingService silencingService;
+    private readonly IAlertEscalationService? escalationService;
     private readonly ILogger<AlertHistoryController> logger;
 
     public AlertHistoryController(
         IAlertPersistenceService persistenceService,
         IAlertSilencingService silencingService,
-        ILogger<AlertHistoryController> logger)
+        ILogger<AlertHistoryController> logger,
+        IAlertEscalationService? escalationService = null)
     {
         this.persistenceService = persistenceService;
         this.silencingService = silencingService;
         this.logger = logger;
+        this.escalationService = escalationService;
     }
 
     /// <summary>
@@ -264,4 +267,133 @@ public sealed class AlertHistoryController : ControllerBase
             return this.StatusCode(500, new { error = "Failed to deactivate silencing rule" });
         }
     }
+
+    /// <summary>
+    /// Acknowledge an alert (stops escalation).
+    /// </summary>
+    [HttpPost("{alertId}/acknowledge")]
+    [Authorize]
+    public async Task<IActionResult> AcknowledgeAlert(long alertId, [FromBody] AcknowledgeAlertRequest request)
+    {
+        if (this.escalationService == null)
+        {
+            return this.BadRequest(new { error = "Alert escalation is not enabled" });
+        }
+
+        if (!this.ModelState.IsValid)
+        {
+            return this.BadRequest(this.ModelState);
+        }
+
+        try
+        {
+            await this.escalationService.AcknowledgeAlertAsync(alertId, request.AcknowledgedBy, request.Notes);
+            return this.Ok(new { status = "acknowledged", alertId });
+        }
+        catch (Exception ex)
+        {
+            this.logger.LogError(ex, "Failed to acknowledge alert: {AlertId}", alertId);
+            return this.StatusCode(500, new { error = "Failed to acknowledge alert" });
+        }
+    }
+
+    /// <summary>
+    /// Get escalation status for an alert.
+    /// </summary>
+    [HttpGet("{alertId}/escalation")]
+    [Authorize]
+    public async Task<IActionResult> GetEscalationStatus(long alertId)
+    {
+        if (this.escalationService == null)
+        {
+            return this.BadRequest(new { error = "Alert escalation is not enabled" });
+        }
+
+        try
+        {
+            var status = await this.escalationService.GetEscalationStatusAsync(alertId);
+            if (status == null)
+            {
+                return this.NotFound(new { error = "No escalation found for this alert" });
+            }
+
+            return this.Ok(status);
+        }
+        catch (Exception ex)
+        {
+            this.logger.LogError(ex, "Failed to get escalation status for alert: {AlertId}", alertId);
+            return this.StatusCode(500, new { error = "Failed to retrieve escalation status" });
+        }
+    }
+
+    /// <summary>
+    /// Get escalation history for an alert.
+    /// </summary>
+    [HttpGet("{alertId}/escalation/history")]
+    [Authorize]
+    public async Task<IActionResult> GetEscalationHistory(long alertId)
+    {
+        if (this.escalationService == null)
+        {
+            return this.BadRequest(new { error = "Alert escalation is not enabled" });
+        }
+
+        try
+        {
+            var history = await this.escalationService.GetEscalationHistoryAsync(alertId);
+            return this.Ok(new { events = history, count = history.Count });
+        }
+        catch (Exception ex)
+        {
+            this.logger.LogError(ex, "Failed to get escalation history for alert: {AlertId}", alertId);
+            return this.StatusCode(500, new { error = "Failed to retrieve escalation history" });
+        }
+    }
+
+    /// <summary>
+    /// Cancel escalation for an alert.
+    /// </summary>
+    [HttpPost("{alertId}/escalation/cancel")]
+    [Authorize]
+    public async Task<IActionResult> CancelEscalation(long alertId, [FromBody] CancelEscalationRequest request)
+    {
+        if (this.escalationService == null)
+        {
+            return this.BadRequest(new { error = "Alert escalation is not enabled" });
+        }
+
+        if (!this.ModelState.IsValid)
+        {
+            return this.BadRequest(this.ModelState);
+        }
+
+        try
+        {
+            await this.escalationService.CancelEscalationAsync(alertId, request.Reason);
+            return this.Ok(new { status = "cancelled", alertId });
+        }
+        catch (Exception ex)
+        {
+            this.logger.LogError(ex, "Failed to cancel escalation for alert: {AlertId}", alertId);
+            return this.StatusCode(500, new { error = "Failed to cancel escalation" });
+        }
+    }
+}
+
+/// <summary>
+/// Request to acknowledge an alert.
+/// </summary>
+public sealed class AcknowledgeAlertRequest
+{
+    public string AcknowledgedBy { get; set; } = string.Empty;
+
+    public string? Notes { get; set; }
+}
+
+/// <summary>
+/// Request to cancel an escalation.
+/// </summary>
+public sealed class CancelEscalationRequest
+{
+    public string Reason { get; set; } = string.Empty;
 }

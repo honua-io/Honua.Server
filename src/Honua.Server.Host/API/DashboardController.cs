@@ -1,6 +1,7 @@
 // Copyright (c) 2025 HonuaIO
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Honua.Server.Core.Models.Dashboard;
@@ -14,7 +15,8 @@ namespace Honua.Server.Host.API;
 /// Provides endpoints for creating, reading, updating, and deleting dashboards.
 /// </summary>
 [ApiController]
-[Route("api/dashboards")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/dashboards")]
 [Produces("application/json")]
 [Authorize]
 public class DashboardController : ControllerBase

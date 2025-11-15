@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canary Deployment Configuration",
+  "description": "Example configuration for canary deployment with automated health checks and rollback",
+  "type": "object",
+  "properties": {
+    "canary": {
+      "type": "object",
+      "properties": {
+        "serviceName": {
+          "type": "string",
+          "description": "Name of the service cluster",
+          "example": "honua-api"
+        },
+        "currentVersion": {
+          "type": "string",
+          "description": "Current stable version (blue)",
+          "example": "v1.2.0"
+        },
+        "canaryVersion": {
+          "type": "string",
+          "description": "New version to test (green)",
+          "example": "v1.3.0"
+        },
+        "endpoints": {
+          "type": "object",
+          "properties": {
+            "stable": {
+              "type": "string",
+              "description": "Stable environment endpoint",
+              "example": "http://api-stable:8080"
+            },
+            "canary": {
+              "type": "string",
+              "description": "Canary environment endpoint",
+              "example": "http://api-canary:8080"
+            }
+          }
+        },
+        "strategy": {
+          "type": "object",
+          "properties": {
+            "trafficSteps": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "description": "Progressive traffic increase steps (percentage to canary)",
+              "example": [5, 10, 25, 50, 100]
+            },
+            "soakDuration": {
+              "type": "object",
+              "description": "Wait time at each stage before proceeding",
+              "properties": {
+                "amount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "example": 10
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": ["seconds", "minutes", "hours"],
+                  "example": "minutes"
+                }
+              }
+            },
+            "autoPromote": {
+              "type": "boolean",
+              "description": "Automatically promote to next stage if metrics are healthy",
+              "example": true
+            },
+            "autoRollback": {
+              "type": "boolean",
+              "description": "Automatically rollback on health check or metric failures",
+              "example": true
+            }
+          }
+        },
+        "healthChecks": {
+          "type": "object",
+          "properties": {
+            "canaryEndpoint": {
+              "type": "string",
+              "description": "Canary health check endpoint",
+              "example": "/health/ready"
+            },
+            "interval": {
+              "type": "integer",
+              "description": "Health check interval in seconds",
+              "example": 10
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Health check timeout in seconds",
+              "example": 5
+            },
+            "consecutiveFailures": {
+              "type": "integer",
+              "description": "Number of consecutive failures before marking unhealthy",
+              "example": 2
+            },
+            "customChecks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "database-connectivity"
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "example": "/health/database"
+                  },
+                  "critical": {
+                    "type": "boolean",
+                    "description": "Whether failure of this check should trigger rollback",
+                    "example": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["prometheus", "datadog", "cloudwatch", "custom"],
+              "example": "prometheus"
+            },
+            "prometheusUrl": {
+              "type": "string",
+              "description": "Prometheus endpoint URL (if source=prometheus)",
+              "example": "http://prometheus:9090"
+            },
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "errorRate": {
+                  "type": "object",
+                  "properties": {
+                    "warning": {
+                      "type": "number",
+                      "description": "Warning threshold (0.0-1.0)",
+                      "example": 0.02
+                    },
+                    "critical": {
+                      "type": "number",
+                      "description": "Critical threshold - triggers rollback",
+                      "example": 0.05
+                    }
+                  }
+                },
+                "latencyP95Ms": {
+                  "type": "object",
+                  "properties": {
+                    "warning": {
+                      "type": "integer",
+                      "example": 1500
+                    },
+                    "critical": {
+                      "type": "integer",
+                      "example": 3000
+                    }
+                  }
+                },
+                "latencyP99Ms": {
+                  "type": "object",
+                  "properties": {
+                    "warning": {
+                      "type": "integer",
+                      "example": 3000
+                    },
+                    "critical": {
+                      "type": "integer",
+                      "example": 5000
+                    }
+                  }
+                },
+                "requestRate": {
+                  "type": "object",
+                  "description": "Expected requests per second (for anomaly detection)",
+                  "properties": {
+                    "min": {
+                      "type": "integer",
+                      "example": 10
+                    },
+                    "max": {
+                      "type": "integer",
+                      "example": 1000
+                    }
+                  }
+                }
+              }
+            },
+            "comparisonPeriod": {
+              "type": "string",
+              "description": "Time window for comparing canary vs stable metrics",
+              "example": "5m"
+            }
+          }
+        },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "example": true
+            },
+            "channels": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["slack", "email", "pagerduty", "webhook"],
+                    "example": "slack"
+                  },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "webhookUrl": {
+                        "type": "string",
+                        "example": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX"
+                      },
+                      "channel": {
+                        "type": "string",
+                        "example": "#deployments"
+                      }
+                    }
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["started", "stage_complete", "success", "failure", "rollback"]
+                    },
+                    "example": ["started", "failure", "rollback", "success"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "rollbackStrategy": {
+          "type": "object",
+          "properties": {
+            "immediate": {
+              "type": "boolean",
+              "description": "Immediately rollback on critical failure (vs. gradual)",
+              "example": true
+            },
+            "preserveCanary": {
+              "type": "boolean",
+              "description": "Keep canary environment running after rollback for debugging",
+              "example": true
+            },
+            "retryAfterRollback": {
+              "type": "boolean",
+              "description": "Automatically retry deployment after rollback",
+              "example": false
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "canary": {
+        "serviceName": "honua-api",
+        "currentVersion": "v1.2.0",
+        "canaryVersion": "v1.3.0",
+        "endpoints": {
+          "stable": "http://api-stable.honua.svc.cluster.local:8080",
+          "canary": "http://api-canary.honua.svc.cluster.local:8080"
+        },
+        "strategy": {
+          "trafficSteps": [5, 10, 25, 50, 100],
+          "soakDuration": {
+            "amount": 10,
+            "unit": "minutes"
+          },
+          "autoPromote": true,
+          "autoRollback": true
+        },
+        "healthChecks": {
+          "canaryEndpoint": "/health/ready",
+          "interval": 10,
+          "timeout": 5,
+          "consecutiveFailures": 2,
+          "customChecks": [
+            {
+              "name": "database-connectivity",
+              "endpoint": "/health/database",
+              "critical": true
+            },
+            {
+              "name": "cache-connectivity",
+              "endpoint": "/health/cache",
+              "critical": false
+            }
+          ]
+        },
+        "metrics": {
+          "source": "prometheus",
+          "prometheusUrl": "http://prometheus.honua.svc.cluster.local:9090",
+          "thresholds": {
+            "errorRate": {
+              "warning": 0.02,
+              "critical": 0.05
+            },
+            "latencyP95Ms": {
+              "warning": 1500,
+              "critical": 3000
+            },
+            "latencyP99Ms": {
+              "warning": 3000,
+              "critical": 5000
+            },
+            "requestRate": {
+              "min": 10,
+              "max": 1000
+            }
+          },
+          "comparisonPeriod": "5m"
+        },
+        "notifications": {
+          "enabled": true,
+          "channels": [
+            {
+              "type": "slack",
+              "config": {
+                "webhookUrl": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX",
+                "channel": "#deployments"
+              },
+              "events": ["started", "failure", "rollback", "success"]
+            }
+          ]
+        },
+        "rollbackStrategy": {
+          "immediate": true,
+          "preserveCanary": true,
+          "retryAfterRollback": false
+        }
+      }
+    }
+  ]
+}

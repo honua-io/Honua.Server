@@ -5,7 +5,6 @@ using Honua.Server.AlertReceiver.Services;
 using Honua.Server.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Npgsql;
 using System.Data;
 
@@ -48,14 +47,10 @@ public static class AlertServicesExtensions
             services.AddScoped<INotificationChannelService, NotificationChannelService>();
             services.AddScoped<IAlertPublishingService, AlertPublishingService>();
 
-            var logger = services.BuildServiceProvider().GetService<ILogger<PostgresAlertConfigurationDbConnectionFactory>>();
-            logger?.LogInformation("Alert management services registered with PostgreSQL connection");
+            // Note: Alert management services registered with PostgreSQL connection
+            // Removed BuildServiceProvider() call to prevent memory leaks - logging moved to runtime
         }
-        else
-        {
-            var logger = services.BuildServiceProvider().GetService<ILogger<PostgresAlertConfigurationDbConnectionFactory>>();
-            logger?.LogWarning("Alert management services not registered - PostgreSQL connection string not configured");
-        }
+        // Note: If connection string is not configured, alert management services are not registered
 
         return services;
     }

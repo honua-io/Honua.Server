@@ -2,53 +2,35 @@
 // Licensed under the Elastic License 2.0. See LICENSE file in the project root for full license information.
 ﻿using System;
 using System.Linq;
-using Honua.Server.Core.Configuration.V2;
 using System.Text.Json;
-using Honua.Server.Core.Configuration.V2;
 using System.Text.Json.Nodes;
-using Honua.Server.Core.Configuration.V2;
 using System.Text.Json.Serialization;
-using Honua.Server.Core.Configuration.V2;
 using System.Threading;
-using Honua.Server.Core.Configuration.V2;
 using System.Threading.Tasks;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Configuration;
 using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Geoservices.GeometryService;
-using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Logging;
-using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Observability;
-using Honua.Server.Core.Configuration.V2;
-using Honua.Server.Core.Utilities;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Core.Extensions;
-using Honua.Server.Core.Configuration.V2;
+using Honua.Server.Core.Geoservices.GeometryService;
+using Honua.Server.Core.Logging;
+using Honua.Server.Core.Observability;
+using Honua.Server.Core.Utilities;
 using Honua.Server.Host.Extensions;
-using Honua.Server.Core.Configuration.V2;
+using Honua.Server.Host.GeoservicesREST.Filters;
 using Honua.Server.Host.GeoservicesREST.Services;
-using Honua.Server.Core.Configuration.V2;
 using Honua.Server.Host.Utilities;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Authorization;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Http;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.AspNetCore.Mvc;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Logging;
-using Honua.Server.Core.Configuration.V2;
 using Microsoft.Extensions.Primitives;
-using Honua.Server.Core.Configuration.V2;
 using NetTopologySuite.Geometries;
-using Honua.Server.Core.Configuration.V2;
 
 namespace Honua.Server.Host.GeoservicesREST;
 
 [ApiController]
 [Authorize(Policy = "RequireViewer")]
 [Route("v1/rest/services/Geometry/GeometryServer")]
+[ServiceFilter(typeof(GeometryOperationExceptionFilter))]
 public sealed class GeoservicesRESTGeometryServerController : ControllerBase
 {
     private const int OperationTimeoutSeconds = 30;
@@ -458,26 +440,6 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
             return this.Ok(response);
         }
-        catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
-        {
-            this.logger.LogWarning(ex, "Geometry complexity validation failed for simplify operation");
-            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
-        }
-        catch (OperationCanceledException)
-        {
-            this.logger.LogOperationTimeout("Simplify operation", OperationTimeoutSeconds);
-            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
-        }
-        catch (GeometrySerializationException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry serialization", "simplify operation");
-            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
-        }
-        catch (GeometryServiceException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry service operation", "simplify operation");
-            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
-        }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
@@ -656,26 +618,6 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var response = this.serializer.SerializeGeometry(result, geometryType, srid);
             return this.Ok(new { geometry = response });
         }
-        catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
-        {
-            this.logger.LogWarning(ex, "Geometry complexity validation failed for union operation");
-            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
-        }
-        catch (OperationCanceledException)
-        {
-            this.logger.LogOperationTimeout("Union operation", OperationTimeoutSeconds);
-            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
-        }
-        catch (GeometrySerializationException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry serialization", "union operation");
-            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
-        }
-        catch (GeometryServiceException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry service operation", "union operation");
-            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
-        }
         finally
         {
             var elapsed = DateTime.UtcNow - startTime;
@@ -715,26 +657,6 @@ public sealed class GeoservicesRESTGeometryServerController : ControllerBase
             var result = this.executor.Intersect(operation, cts.Token);
             var response = this.serializer.SerializeGeometries(result, geometryType, srid, cts.Token);
             return this.Ok(response);
-        }
-        catch (ArgumentException ex) when (ex.Message.Contains("vertices") || ex.Message.Contains("coordinates") || ex.Message.Contains("nesting"))
-        {
-            this.logger.LogWarning(ex, "Geometry complexity validation failed for intersect operation");
-            return this.BadRequest(new { error = $"Geometry complexity limit exceeded: {ex.Message}" });
-        }
-        catch (OperationCanceledException)
-        {
-            this.logger.LogOperationTimeout("Intersect operation", OperationTimeoutSeconds);
-            return this.StatusCode(StatusCodes.Status408RequestTimeout, new { error = $"Operation timed out after {OperationTimeoutSeconds} seconds." });
-        }
-        catch (GeometrySerializationException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry serialization", "intersect operation");
-            return this.BadRequest(new { error = "Geometry serialization failed. Check server logs for details." });
-        }
-        catch (GeometryServiceException ex)
-        {
-            this.logger.LogOperationFailure(ex, "Geometry service operation", "intersect operation");
-            return this.BadRequest(new { error = "Geometry operation failed. Check server logs for details." });
         }
         finally
         {

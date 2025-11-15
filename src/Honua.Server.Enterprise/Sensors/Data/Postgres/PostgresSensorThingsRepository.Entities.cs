@@ -25,6 +25,7 @@ public sealed partial class PostgresSensorThingsRepository
 
     public async Task<HistoricalLocation?> GetHistoricalLocationAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT
                 id::text,
@@ -35,7 +36,7 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE id = @Id::uuid
             """;
 
-        var historicalLocation = await _connection.QuerySingleOrDefaultAsync<HistoricalLocation>(
+        var historicalLocation = await connection.QuerySingleOrDefaultAsync<HistoricalLocation>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (historicalLocation != null)
@@ -59,7 +60,7 @@ public sealed partial class PostgresSensorThingsRepository
                     WHERE hll.historical_location_id = @HistoricalLocationId::uuid
                     """;
 
-                var results = await _connection.QueryAsync<dynamic>(
+                var results = await connection.QueryAsync<dynamic>(
                     new CommandDefinition(locationsSql, new { HistoricalLocationId = id }, cancellationToken: ct));
 
                 // Use deferred execution to avoid materializing collection until accessed
@@ -82,9 +83,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return historicalLocation;
     }
+    }
 
     public async Task<PagedResult<HistoricalLocation>> GetHistoricalLocationsAsync(QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sql = "SELECT id::text, thing_id::text, time, created_at FROM sta_historical_locations";
         var countSql = "SELECT COUNT(*) FROM sta_historical_locations";
         var parameters = new DynamicParameters();
@@ -114,7 +117,7 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var historicalLocations = await _connection.QueryAsync<HistoricalLocation>(
+        var historicalLocations = await connection.QueryAsync<HistoricalLocation>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -123,7 +126,7 @@ public sealed partial class PostgresSensorThingsRepository
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
@@ -140,6 +143,7 @@ public sealed partial class PostgresSensorThingsRepository
             NextLink = nextLink
         };
     }
+    }
 
     // ============================================================================
     // Sensor operations
@@ -147,13 +151,14 @@ public sealed partial class PostgresSensorThingsRepository
 
     public async Task<Sensor?> GetSensorAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT id::text, name, description, encoding_type, metadata, properties, created_at, updated_at
             FROM sta_sensors
             WHERE id = @Id::uuid
             """;
 
-        var sensor = await _connection.QuerySingleOrDefaultAsync<Sensor>(
+        var sensor = await connection.QuerySingleOrDefaultAsync<Sensor>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (sensor != null)
@@ -163,9 +168,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return sensor;
     }
+    }
 
     public async Task<PagedResult<Sensor>> GetSensorsAsync(QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sql = "SELECT id::text, name, description, encoding_type, metadata, properties, created_at, updated_at FROM sta_sensors";
         var countSql = "SELECT COUNT(*) FROM sta_sensors";
         var parameters = new DynamicParameters();
@@ -192,7 +199,7 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var sensors = await _connection.QueryAsync<Sensor>(
+        var sensors = await connection.QueryAsync<Sensor>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -201,7 +208,7 @@ public sealed partial class PostgresSensorThingsRepository
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
@@ -218,16 +225,18 @@ public sealed partial class PostgresSensorThingsRepository
             NextLink = nextLink
         };
     }
+    }
 
     public async Task<Sensor> CreateSensorAsync(Sensor sensor, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO sta_sensors (name, description, encoding_type, metadata, properties)
             VALUES (@Name, @Description, @EncodingType, @Metadata, @Properties::jsonb)
             RETURNING id::text, name, description, encoding_type, metadata, properties, created_at, updated_at
             """;
 
-        var created = await _connection.QuerySingleAsync<Sensor>(
+        var created = await connection.QuerySingleAsync<Sensor>(
             new CommandDefinition(sql, new
             {
                 sensor.Name,
@@ -243,9 +252,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return created;
     }
+    }
 
     public async Task<Sensor> UpdateSensorAsync(string id, Sensor sensor, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             UPDATE sta_sensors
             SET
@@ -258,7 +269,7 @@ public sealed partial class PostgresSensorThingsRepository
             RETURNING id::text, name, description, encoding_type, metadata, properties, created_at, updated_at
             """;
 
-        var updated = await _connection.QuerySingleAsync<Sensor>(
+        var updated = await connection.QuerySingleAsync<Sensor>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -275,15 +286,18 @@ public sealed partial class PostgresSensorThingsRepository
 
         return updated;
     }
+    }
 
     public async Task DeleteSensorAsync(string id, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = "DELETE FROM sta_sensors WHERE id = @Id::uuid";
 
-        await _connection.ExecuteAsync(
+        await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted Sensor {SensorId}", id);
+    }
     }
 
     // ============================================================================
@@ -292,13 +306,14 @@ public sealed partial class PostgresSensorThingsRepository
 
     public async Task<ObservedProperty?> GetObservedPropertyAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT id::text, name, description, definition, properties, created_at, updated_at
             FROM sta_observed_properties
             WHERE id = @Id::uuid
             """;
 
-        var observedProperty = await _connection.QuerySingleOrDefaultAsync<ObservedProperty>(
+        var observedProperty = await connection.QuerySingleOrDefaultAsync<ObservedProperty>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (observedProperty != null)
@@ -308,9 +323,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return observedProperty;
     }
+    }
 
     public async Task<PagedResult<ObservedProperty>> GetObservedPropertiesAsync(QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sql = "SELECT id::text, name, description, definition, properties, created_at, updated_at FROM sta_observed_properties";
         var countSql = "SELECT COUNT(*) FROM sta_observed_properties";
         var parameters = new DynamicParameters();
@@ -337,7 +354,7 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var observedProperties = await _connection.QueryAsync<ObservedProperty>(
+        var observedProperties = await connection.QueryAsync<ObservedProperty>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -346,7 +363,7 @@ public sealed partial class PostgresSensorThingsRepository
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
@@ -363,16 +380,18 @@ public sealed partial class PostgresSensorThingsRepository
             NextLink = nextLink
         };
     }
+    }
 
     public async Task<ObservedProperty> CreateObservedPropertyAsync(ObservedProperty observedProperty, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             INSERT INTO sta_observed_properties (name, description, definition, properties)
             VALUES (@Name, @Description, @Definition, @Properties::jsonb)
             RETURNING id::text, name, description, definition, properties, created_at, updated_at
             """;
 
-        var created = await _connection.QuerySingleAsync<ObservedProperty>(
+        var created = await connection.QuerySingleAsync<ObservedProperty>(
             new CommandDefinition(sql, new
             {
                 observedProperty.Name,
@@ -387,9 +406,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return created;
     }
+    }
 
     public async Task<ObservedProperty> UpdateObservedPropertyAsync(string id, ObservedProperty observedProperty, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             UPDATE sta_observed_properties
             SET
@@ -401,7 +422,7 @@ public sealed partial class PostgresSensorThingsRepository
             RETURNING id::text, name, description, definition, properties, created_at, updated_at
             """;
 
-        var updated = await _connection.QuerySingleAsync<ObservedProperty>(
+        var updated = await connection.QuerySingleAsync<ObservedProperty>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -417,15 +438,18 @@ public sealed partial class PostgresSensorThingsRepository
 
         return updated;
     }
+    }
 
     public async Task DeleteObservedPropertyAsync(string id, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = "DELETE FROM sta_observed_properties WHERE id = @Id::uuid";
 
-        await _connection.ExecuteAsync(
+        await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted ObservedProperty {ObservedPropertyId}", id);
+    }
     }
 
     // ============================================================================
@@ -434,6 +458,7 @@ public sealed partial class PostgresSensorThingsRepository
 
     public async Task<FeatureOfInterest?> GetFeatureOfInterestAsync(string id, ExpandOptions? expand = null, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             SELECT
                 id::text,
@@ -448,7 +473,7 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE id = @Id::uuid
             """;
 
-        var result = await _connection.QuerySingleOrDefaultAsync<dynamic>(
+        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (result == null)
@@ -490,9 +515,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return featureOfInterest;
     }
+    }
 
     public async Task<PagedResult<FeatureOfInterest>> GetFeaturesOfInterestAsync(QueryOptions options, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var sqlBuilder = new StringBuilder("""
             SELECT
                 id::text,
@@ -533,7 +560,7 @@ public sealed partial class PostgresSensorThingsRepository
         parameters.Add("Limit", limit);
         parameters.Add("Offset", offset);
 
-        var results = await _connection.QueryAsync<dynamic>(
+        var results = await connection.QueryAsync<dynamic>(
             new CommandDefinition(sqlBuilder.ToString(), parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -563,12 +590,12 @@ public sealed partial class PostgresSensorThingsRepository
             {
                 var countParams = new DynamicParameters();
                 countSql += " WHERE " + TranslateFilter(options.Filter, countParams);
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, countParams, cancellationToken: ct));
             }
             else
             {
-                totalCount = await _connection.ExecuteScalarAsync<long>(
+                totalCount = await connection.ExecuteScalarAsync<long>(
                     new CommandDefinition(countSql, cancellationToken: ct));
             }
         }
@@ -579,9 +606,11 @@ public sealed partial class PostgresSensorThingsRepository
             TotalCount = totalCount
         };
     }
+    }
 
     public async Task<FeatureOfInterest> CreateFeatureOfInterestAsync(FeatureOfInterest featureOfInterest, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var featureGeoJson = featureOfInterest.Feature != null
             ? _geoJsonWriter.Write(featureOfInterest.Feature)
             : null;
@@ -612,7 +641,7 @@ public sealed partial class PostgresSensorThingsRepository
                 updated_at
             """;
 
-        var result = await _connection.QuerySingleAsync<dynamic>(
+        var result = await connection.QuerySingleAsync<dynamic>(
             new CommandDefinition(sql, new
             {
                 featureOfInterest.Name,
@@ -646,9 +675,11 @@ public sealed partial class PostgresSensorThingsRepository
 
         return created;
     }
+    }
 
     public async Task<FeatureOfInterest> UpdateFeatureOfInterestAsync(string id, FeatureOfInterest featureOfInterest, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var featureGeoJson = featureOfInterest.Feature != null
             ? _geoJsonWriter.Write(featureOfInterest.Feature)
             : null;
@@ -674,7 +705,7 @@ public sealed partial class PostgresSensorThingsRepository
                 updated_at
             """;
 
-        var result = await _connection.QuerySingleOrDefaultAsync<dynamic>(
+        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -712,21 +743,24 @@ public sealed partial class PostgresSensorThingsRepository
 
         return updated;
     }
+    }
 
     public async Task DeleteFeatureOfInterestAsync(string id, CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         const string sql = """
             DELETE FROM sta_features_of_interest
             WHERE id = @Id::uuid
             """;
 
-        var rowsAffected = await _connection.ExecuteAsync(
+        var rowsAffected = await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (rowsAffected == 0)
             throw new InvalidOperationException($"FeatureOfInterest {id} not found");
 
         _logger.LogInformation("Deleted FeatureOfInterest {FeatureOfInterestId}", id);
+    }
     }
 
     public async Task<FeatureOfInterest> GetOrCreateFeatureOfInterestAsync(
@@ -735,6 +769,7 @@ public sealed partial class PostgresSensorThingsRepository
         Geometry geometry,
         CancellationToken ct = default)
     {
+        using var connection = _connectionFactory.CreateConnection();
         var featureGeoJson = geometry != null ? _geoJsonWriter.Write(geometry) : null;
 
         // First, try to find an existing FeatureOfInterest with the same geometry
@@ -753,7 +788,7 @@ public sealed partial class PostgresSensorThingsRepository
             LIMIT 1
             """;
 
-        var existing = await _connection.QuerySingleOrDefaultAsync<dynamic>(
+        var existing = await connection.QuerySingleOrDefaultAsync<dynamic>(
             new CommandDefinition(findSql, new { FeatureGeoJson = featureGeoJson }, cancellationToken: ct));
 
         if (existing != null)
@@ -804,7 +839,7 @@ public sealed partial class PostgresSensorThingsRepository
                 updated_at
             """;
 
-        var created = await _connection.QuerySingleAsync<dynamic>(
+        var created = await connection.QuerySingleAsync<dynamic>(
             new CommandDefinition(createSql, new
             {
                 Name = name,
@@ -832,5 +867,6 @@ public sealed partial class PostgresSensorThingsRepository
             UpdatedAt = created.updated_at,
             SelfLink = $"{_config.BasePath}/FeaturesOfInterest({createdId})"
         };
+    }
     }
 }

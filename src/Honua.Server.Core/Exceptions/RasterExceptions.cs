@@ -9,11 +9,19 @@ namespace Honua.Server.Core.Exceptions;
 /// </summary>
 public class RasterException : HonuaException
 {
-    public RasterException(string message) : base(message)
+    public RasterException(string message) : base(message, ErrorCodes.RASTER_ERROR)
     {
     }
 
-    public RasterException(string message, Exception innerException) : base(message, innerException)
+    public RasterException(string message, Exception innerException) : base(message, ErrorCodes.RASTER_ERROR, innerException)
+    {
+    }
+
+    public RasterException(string message, string? errorCode) : base(message, errorCode)
+    {
+    }
+
+    public RasterException(string message, string? errorCode, Exception innerException) : base(message, errorCode, innerException)
     {
     }
 }
@@ -26,13 +34,13 @@ public sealed class RasterProcessingException : RasterException, ITransientExcep
     public bool IsTransient { get; }
 
     public RasterProcessingException(string message, bool isTransient = true)
-        : base(message)
+        : base(message, ErrorCodes.RASTER_PROCESSING_FAILED)
     {
         IsTransient = isTransient;
     }
 
     public RasterProcessingException(string message, Exception innerException, bool isTransient = true)
-        : base(message, innerException)
+        : base(message, ErrorCodes.RASTER_PROCESSING_FAILED, innerException)
     {
         IsTransient = isTransient;
     }
@@ -47,7 +55,7 @@ public sealed class RasterSourceNotFoundException : RasterException
     public string SourcePath { get; }
 
     public RasterSourceNotFoundException(string sourcePath)
-        : base($"Raster source '{sourcePath}' was not found.")
+        : base($"Raster source '{sourcePath}' was not found.", ErrorCodes.RASTER_SOURCE_NOT_FOUND)
     {
         SourcePath = sourcePath;
     }
@@ -62,7 +70,7 @@ public sealed class UnsupportedRasterFormatException : RasterException
     public string Format { get; }
 
     public UnsupportedRasterFormatException(string format)
-        : base($"Raster format '{format}' is not supported.")
+        : base($"Raster format '{format}' is not supported.", ErrorCodes.UNSUPPORTED_RASTER_FORMAT)
     {
         Format = format;
     }

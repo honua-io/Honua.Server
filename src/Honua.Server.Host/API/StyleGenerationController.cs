@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
+using Asp.Versioning;
 using Honua.MapSDK.Styling;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Query;
@@ -18,7 +19,8 @@ namespace Honua.Server.Host.API;
 /// API for automatic cartographic style generation
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/style-generation")]
 [Produces("application/json")]
 public class StyleGenerationController : ControllerBase
 {

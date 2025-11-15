@@ -15,11 +15,16 @@ public sealed class FeatureContextResolver : IFeatureContextResolver
 {
     private readonly IMetadataRegistry _metadataRegistry;
     private readonly IDataStoreProviderFactory _providerFactory;
+    private readonly IDataSourceRouter? _dataSourceRouter;
 
-    public FeatureContextResolver(IMetadataRegistry metadataRegistry, IDataStoreProviderFactory providerFactory)
+    public FeatureContextResolver(
+        IMetadataRegistry metadataRegistry,
+        IDataStoreProviderFactory providerFactory,
+        IDataSourceRouter? dataSourceRouter = null)
     {
         _metadataRegistry = metadataRegistry ?? throw new ArgumentNullException(nameof(metadataRegistry));
         _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
+        _dataSourceRouter = dataSourceRouter; // Optional - null when read replica routing is disabled
     }
 
     public async Task<FeatureContext> ResolveAsync(string serviceId, string layerId, CancellationToken cancellationToken = default)

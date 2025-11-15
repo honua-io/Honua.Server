@@ -31,73 +31,93 @@ public sealed class CompositeAlertPublisher : DisposableBase, IAlertPublisher
 
     public async Task PublishAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
     {
+        var result = await this.PublishWithResultAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
+
+        // Maintain backward compatibility - throw if all failed
+        if (result.AllFailed)
+        {
+            throw new InvalidOperationException($"All alert publishers failed. Failed channels: {string.Join(", ", result.FailedChannels)}");
+        }
+    }
+
+    public async Task<AlertDeliveryResult> PublishWithResultAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
+    {
         var tasks = new List<Task>();
-        var errors = new List<Exception>();
+        var errors = new Dictionary<string, Exception>();
+        var successful = new HashSet<string>();
 
         foreach (var publisher in this.publishers)
         {
-            // Fire-and-forget pattern with error capture
-        var task = this.PublishWithErrorHandling(publisher, webhook, severity, errors, cancellationToken);
+            var task = this.PublishWithResultTracking(publisher, webhook, severity, successful, errors, cancellationToken);
             tasks.Add(task);
         }
 
         await Task.WhenAll(tasks).ConfigureAwait(false);
 
+        var result = new AlertDeliveryResult
+        {
+            SuccessfulChannels = successful.ToList(),
+            FailedChannels = errors.Keys.ToList(),
+        };
+
         if (errors.Count > 0)
         {
             this.logger.LogWarning(
-                "Published to {SuccessCount}/{TotalCount} providers, {ErrorCount} failed",
-                this.publishers.Count() - errors.Count,
+                "Published to {SuccessCount}/{TotalCount} providers, {ErrorCount} failed. Successful: [{Successful}], Failed: [{Failed}]",
+                successful.Count,
                 this.publishers.Count(),
-                errors.Count);
-
-            // Re-throw if ALL publishers failed
-            if (errors.Count == this.publishers.Count())
-            {
-                throw new AggregateException("All alert publishers failed", errors);
-            }
+                errors.Count,
+                string.Join(", ", successful),
+                string.Join(", ", errors.Keys));
         }
         else
         {
             this.logger.LogInformation(
-                "Successfully published alert to {Count} providers",
-                this.publishers.Count());
+                "Successfully published alert to {Count} providers: [{Channels}]",
+                this.publishers.Count(),
+                string.Join(", ", successful));
         }
+
+        return result;
     }
 
-    private async Task PublishWithErrorHandling(
+    private async Task PublishWithResultTracking(
         IAlertPublisher publisher,
         AlertManagerWebhook webhook,
         string severity,
-        List<Exception> errors,
+        HashSet<string> successful,
+        Dictionary<string, Exception> errors,
         CancellationToken cancellationToken)
     {
-        // RESOURCE LEAK FIX: Track semaphore acquisition to ensure proper release even on cancellation
         var semaphoreAcquired = false;
+        var publisherName = publisher.GetType().Name.Replace("AlertPublisher", string.Empty);
+
         try
         {
-            // CONCURRENCY FIX: Throttle concurrent publishing
             await this.concurrencyThrottle.WaitAsync(cancellationToken).ConfigureAwait(false);
             semaphoreAcquired = true;
 
             await publisher.PublishAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
+
+            lock (successful)
+            {
+                successful.Add(publisherName);
+            }
         }
         catch (OperationCanceledException)
         {
-            // Cancellation is expected, don't log as error
             throw;
         }
         catch (Exception ex)
         {
-            this.logger.LogError(ex, "Publisher {Publisher} failed to publish alert", publisher.GetType().Name);
+            this.logger.LogError(ex, "Publisher {Publisher} failed to publish alert", publisherName);
             lock (errors)
             {
-                errors.Add(ex);
+                errors[publisherName] = ex;
             }
         }
         finally
         {
-            // RESOURCE LEAK FIX: Only release if we actually acquired the semaphore
             if (semaphoreAcquired)
             {
                 this.concurrencyThrottle.Release();

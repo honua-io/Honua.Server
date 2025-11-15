@@ -11,22 +11,22 @@ public sealed class GeometrySerializationException : HonuaException
 {
     public string? GeometryType { get; }
 
-    public GeometrySerializationException(string message) : base(message)
+    public GeometrySerializationException(string message) : base(message, ErrorCodes.GEOMETRY_SERIALIZATION_FAILED)
     {
     }
 
-    public GeometrySerializationException(string message, Exception innerException) : base(message, innerException)
+    public GeometrySerializationException(string message, Exception innerException) : base(message, ErrorCodes.GEOMETRY_SERIALIZATION_FAILED, innerException)
     {
     }
 
     public GeometrySerializationException(string geometryType, string message)
-        : base(message)
+        : base(message, ErrorCodes.GEOMETRY_SERIALIZATION_FAILED)
     {
         GeometryType = geometryType;
     }
 
     public GeometrySerializationException(string geometryType, string message, Exception innerException)
-        : base(message, innerException)
+        : base(message, ErrorCodes.GEOMETRY_SERIALIZATION_FAILED, innerException)
     {
         GeometryType = geometryType;
     }
@@ -39,22 +39,22 @@ public sealed class FeatureSerializationException : HonuaException
 {
     public string? Format { get; }
 
-    public FeatureSerializationException(string message) : base(message)
+    public FeatureSerializationException(string message) : base(message, ErrorCodes.FEATURE_SERIALIZATION_FAILED)
     {
     }
 
-    public FeatureSerializationException(string message, Exception innerException) : base(message, innerException)
+    public FeatureSerializationException(string message, Exception innerException) : base(message, ErrorCodes.FEATURE_SERIALIZATION_FAILED, innerException)
     {
     }
 
     public FeatureSerializationException(string format, string message)
-        : base(message)
+        : base(message, ErrorCodes.FEATURE_SERIALIZATION_FAILED)
     {
         Format = format;
     }
 
     public FeatureSerializationException(string format, string message, Exception innerException)
-        : base(message, innerException)
+        : base(message, ErrorCodes.FEATURE_SERIALIZATION_FAILED, innerException)
     {
         Format = format;
     }

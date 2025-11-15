@@ -91,6 +91,23 @@ public sealed class AzureEventGridAlertPublisher : IAlertPublisher, IDisposable
         }
     }
 
+    public async Task<AlertDeliveryResult> PublishWithResultAsync(AlertManagerWebhook webhook, string severity, CancellationToken cancellationToken = default)
+    {
+        var result = new AlertDeliveryResult();
+        try
+        {
+            await this.PublishAsync(webhook, severity, cancellationToken).ConfigureAwait(false);
+            result.SuccessfulChannels.Add("AzureEventGrid");
+        }
+        catch (Exception)
+        {
+            result.FailedChannels.Add("AzureEventGrid");
+            throw;
+        }
+
+        return result;
+    }
+
     public void Dispose()
     {
         // EventGridPublisherClient may hold HTTP resources

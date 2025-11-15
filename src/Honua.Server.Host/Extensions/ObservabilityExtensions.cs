@@ -61,6 +61,16 @@ internal static class ObservabilityExtensions
 
         builder.Logging.AddDebug();
 
+        // Add OpenTelemetry logging with OTLP exporter support (from Honua.Server.Observability)
+        var loggingExporter = observability.Logging?.Exporter?.ToLowerInvariant();
+        if (loggingExporter == "otlp" || loggingExporter == "console")
+        {
+            builder.Logging.AddOpenTelemetryLogging(
+                configuration,
+                serviceName: "Honua.Server.Host",
+                serviceVersion: GetServiceVersion());
+        }
+
         // Add runtime logging configuration filter via options so overrides are resolved once
         builder.Services.AddOptions<LoggerFilterOptions>()
             .Configure<RuntimeLoggingConfigurationService>((options, runtime) =>
@@ -117,15 +127,15 @@ internal static class ObservabilityExtensions
 
         var otelBuilder = services.AddOpenTelemetry();
 
+        // Note: Resource attributes, basic metrics, and tracing configuration are handled
+        // by the AddHonuaObservability extension method in Honua.Server.Observability.
+        // We only add Host-specific meters and exporters here.
+
         if (observability.Metrics is { Enabled: true } metrics)
         {
             otelBuilder.WithMetrics(metricBuilder =>
             {
-                // ASP.NET Core and runtime instrumentation
-                metricBuilder.AddAspNetCoreInstrumentation();
-                metricBuilder.AddRuntimeInstrumentation();
-
-                // Add all Honua meters
+                // Add all Honua meters (in addition to those added by AddHonuaObservability)
                 metricBuilder.AddMeter("Honua.Server.Api");
                 metricBuilder.AddMeter("Honua.Server.Database");
                 metricBuilder.AddMeter("Honua.Server.Cache");
@@ -153,7 +163,7 @@ internal static class ObservabilityExtensions
 
         otelBuilder.WithTracing(tracingBuilder =>
         {
-            tracingBuilder.AddAspNetCoreInstrumentation();
+            // Add Honua-specific activity sources (in addition to those added by AddHonuaObservability)
             tracingBuilder.AddSource("Honua.Server.OgcProtocols");
             tracingBuilder.AddSource("Honua.Server.OData");
             tracingBuilder.AddSource("Honua.Server.Stac");
@@ -163,13 +173,6 @@ internal static class ObservabilityExtensions
             tracingBuilder.AddSource("Honua.Server.Authentication");
             tracingBuilder.AddSource("Honua.Server.Export");
             tracingBuilder.AddSource("Honua.Server.Import");
-
-            // Configure sampling if specified (useful for high-traffic production environments)
-            var samplingRatio = observability.Tracing?.SamplingRatio ?? 1.0;
-            if (samplingRatio < 1.0)
-            {
-                tracingBuilder.SetSampler(new OpenTelemetry.Trace.TraceIdRatioBasedSampler(samplingRatio));
-            }
 
             var exporterType = observability.Tracing?.Exporter?.ToLowerInvariant() ?? "none";
 
@@ -183,6 +186,13 @@ internal static class ObservabilityExtensions
                         if (!endpoint.IsNullOrEmpty())
                         {
                             otlpOptions.Endpoint = new Uri(endpoint);
+                        }
+
+                        // Configure headers if authentication is required
+                        var headers = configuration["observability:tracing:otlpHeaders"];
+                        if (!string.IsNullOrWhiteSpace(headers))
+                        {
+                            otlpOptions.Headers = headers;
                         }
                     });
                     break;
@@ -253,5 +263,13 @@ internal static class ObservabilityExtensions
         }
 
         return endpoint.StartsWith("/", StringComparison.Ordinal) ? endpoint : $"/{endpoint}";
+    }
+
+    private static string GetServiceVersion()
+    {
+        var assembly = System.Reflection.Assembly.GetEntryAssembly();
+        return assembly?.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+               ?? assembly?.GetName().Version?.ToString()
+               ?? "1.0.0";
     }
 }

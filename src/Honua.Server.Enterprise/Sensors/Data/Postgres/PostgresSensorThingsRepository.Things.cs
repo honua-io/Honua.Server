@@ -34,7 +34,8 @@ public sealed partial class PostgresSensorThingsRepository
             WHERE id = @Id::uuid
             """;
 
-        var row = await _connection.QuerySingleOrDefaultAsync<ThingRow>(
+        using var connection = _connectionFactory.CreateConnection();
+        var row = await connection.QuerySingleOrDefaultAsync<ThingRow>(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         if (row == null)
@@ -88,7 +89,8 @@ public sealed partial class PostgresSensorThingsRepository
         var offset = options.Skip ?? 0;
         sql += $" LIMIT {limit} OFFSET {offset}";
 
-        var rows = await _connection.QueryAsync<ThingRow>(
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<ThingRow>(
             new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         // Use deferred execution for projection to avoid unnecessary materialization
@@ -99,7 +101,7 @@ public sealed partial class PostgresSensorThingsRepository
         long? totalCount = null;
         if (options.Count)
         {
-            totalCount = await _connection.ExecuteScalarAsync<long>(
+            totalCount = await connection.ExecuteScalarAsync<long>(
                 new CommandDefinition(countSql, parameters, cancellationToken: ct));
         }
 
@@ -135,7 +137,8 @@ public sealed partial class PostgresSensorThingsRepository
             ORDER BY created_at DESC
             """;
 
-        var rows = await _connection.QueryAsync<ThingRow>(
+        using var connection = _connectionFactory.CreateConnection();
+        var rows = await connection.QueryAsync<ThingRow>(
             new CommandDefinition(sql, new { UserId = userId }, cancellationToken: ct));
 
         // Return as IReadOnlyList to maintain contract while avoiding double allocation
@@ -160,7 +163,8 @@ public sealed partial class PostgresSensorThingsRepository
                 updated_at AS UpdatedAt
             """;
 
-        var createdRow = await _connection.QuerySingleAsync<ThingRow>(
+        using var connection = _connectionFactory.CreateConnection();
+        var createdRow = await connection.QuerySingleAsync<ThingRow>(
             new CommandDefinition(sql, new
             {
                 thing.Name,
@@ -195,7 +199,8 @@ public sealed partial class PostgresSensorThingsRepository
                 updated_at AS UpdatedAt
             """;
 
-        var updatedRow = await _connection.QuerySingleAsync<ThingRow>(
+        using var connection = _connectionFactory.CreateConnection();
+        var updatedRow = await connection.QuerySingleAsync<ThingRow>(
             new CommandDefinition(sql, new
             {
                 Id = id,
@@ -216,7 +221,8 @@ public sealed partial class PostgresSensorThingsRepository
     {
         const string sql = "DELETE FROM sta_things WHERE id = @Id::uuid";
 
-        await _connection.ExecuteAsync(
+        using var connection = _connectionFactory.CreateConnection();
+        await connection.ExecuteAsync(
             new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
 
         _logger.LogInformation("Deleted Thing {ThingId}", id);

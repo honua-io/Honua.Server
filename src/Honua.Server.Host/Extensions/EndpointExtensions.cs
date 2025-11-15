@@ -190,6 +190,9 @@ internal static class EndpointExtensions
         //     app.MapSensorThingsEndpoints(sensorThingsConfig);
         // }
 
+        // OIDC Authentication endpoints (login, logout, user info)
+        app.MapAuthenticationEndpoints();
+
         return app;
     }
 
