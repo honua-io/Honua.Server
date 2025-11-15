@@ -31,12 +31,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.x'
 
@@ -52,7 +52,7 @@ jobs:
           dotnet run -c Release --no-build --exporters json markdown html
 
       - name: Store benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-results-${{ github.sha }}
           path: benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/results/
@@ -109,10 +109,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '9.0.x'
 
@@ -129,7 +129,7 @@ jobs:
           dotnet run -c Release --no-build --filter *Intersection_Small* --exporters markdown
 
       - name: Upload quick results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: quick-benchmark-results-${{ github.sha }}
           path: benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/results/
