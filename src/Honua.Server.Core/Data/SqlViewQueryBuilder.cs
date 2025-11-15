@@ -22,17 +22,21 @@ public sealed class SqlViewQueryBuilder
     private readonly LayerDefinition _layer;
     private readonly SqlViewDefinition _sqlView;
     private readonly IReadOnlyDictionary<string, string> _requestParameters;
+    private readonly SqlViewExecutor _sqlViewExecutor;
 
     public SqlViewQueryBuilder(
         LayerDefinition layer,
-        IReadOnlyDictionary<string, string> requestParameters)
+        IReadOnlyDictionary<string, string> requestParameters,
+        SqlViewExecutor sqlViewExecutor)
     {
         Guard.NotNull(layer);
         Guard.NotNull(requestParameters);
+        Guard.NotNull(sqlViewExecutor);
 
         _layer = layer;
         _sqlView = layer.SqlView ?? throw new ArgumentException("Layer does not have a SQL view defined", nameof(layer));
         _requestParameters = requestParameters;
+        _sqlViewExecutor = sqlViewExecutor;
     }
 
     /// <summary>
@@ -45,7 +49,7 @@ public sealed class SqlViewQueryBuilder
         Guard.NotNull(query);
 
         // Process SQL view with parameters
-        var (baseSql, sqlViewParams) = SqlViewExecutor.ProcessSqlView(
+        var (baseSql, sqlViewParams) = _sqlViewExecutor.ProcessSqlView(
             _sqlView,
             _requestParameters,
             _layer.Id);
@@ -107,7 +111,7 @@ public sealed class SqlViewQueryBuilder
         Guard.NotNull(query);
 
         // Process SQL view with parameters
-        var (baseSql, sqlViewParams) = SqlViewExecutor.ProcessSqlView(
+        var (baseSql, sqlViewParams) = _sqlViewExecutor.ProcessSqlView(
             _sqlView,
             _requestParameters,
             _layer.Id);
@@ -138,7 +142,7 @@ public sealed class SqlViewQueryBuilder
         Guard.NotNullOrWhiteSpace(featureId);
 
         // Process SQL view with parameters
-        var (baseSql, sqlViewParams) = SqlViewExecutor.ProcessSqlView(
+        var (baseSql, sqlViewParams) = _sqlViewExecutor.ProcessSqlView(
             _sqlView,
             _requestParameters,
             _layer.Id);

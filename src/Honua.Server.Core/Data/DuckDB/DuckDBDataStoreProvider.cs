@@ -1136,10 +1136,9 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
                 _ => NormalizeGeometryText(value.ToString())
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log geometry conversion failures in debug builds
-            _logger.LogWarning(ex, "Failed to convert geometry value");
+            // Geometry conversion failed - return as string (no logging in static method)
             return value.ToString();
         }
     }
@@ -1165,10 +1164,9 @@ public sealed class DuckDBDataStoreProvider : DisposableBase, IDataStoreProvider
 
             return WktWriter.Write(geometry);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log WKT parsing failures in debug builds
-            _logger.LogWarning(ex, "Failed to parse geometry text as WKT");
+            // WKT parsing failed - return original text (no logging in static method)
             return text;
         }
     }

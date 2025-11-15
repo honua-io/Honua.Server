@@ -944,7 +944,8 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
-        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var sqlViewExecutor = new SqlViewExecutor(Microsoft.Extensions.Logging.Abstractions.NullLogger<SqlViewExecutor>.Instance);
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters, sqlViewExecutor);
         var queryDef = sqlViewBuilder.BuildSelect(query);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
@@ -985,7 +986,8 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         CancellationToken cancellationToken = default)
     {
         var requestParameters = query.SqlViewParameters ?? new Dictionary<string, string>();
-        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var sqlViewExecutor = new SqlViewExecutor(Microsoft.Extensions.Logging.Abstractions.NullLogger<SqlViewExecutor>.Instance);
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters, sqlViewExecutor);
         var queryDef = sqlViewBuilder.BuildCount(query);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);
@@ -1019,7 +1021,8 @@ public abstract class RelationalDataStoreProviderBase<TConnection, TTransaction,
         CancellationToken cancellationToken = default)
     {
         var requestParameters = query?.SqlViewParameters ?? new Dictionary<string, string>();
-        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters);
+        var sqlViewExecutor = new SqlViewExecutor(Microsoft.Extensions.Logging.Abstractions.NullLogger<SqlViewExecutor>.Instance);
+        var sqlViewBuilder = new SqlViewQueryBuilder(layer, requestParameters, sqlViewExecutor);
         var queryDef = sqlViewBuilder.BuildById(featureId, query);
 
         await using var connection = await CreateConnectionAsync(dataSource, cancellationToken).ConfigureAwait(false);

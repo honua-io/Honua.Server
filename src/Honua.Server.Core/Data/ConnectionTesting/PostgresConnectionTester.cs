@@ -53,13 +53,11 @@ public sealed class PostgresConnectionTester : IConnectionTester
             }
 
             // Decrypt connection string if needed
-            var connectionString = _encryptionService?.DecryptConnectionString(dataSource.ConnectionString)
-                ?? dataSource.ConnectionString;
+            var connectionString = _encryptionService != null
+                ? await _encryptionService.DecryptAsync(dataSource.ConnectionString, cancellationToken).ConfigureAwait(false)
+                : dataSource.ConnectionString;
 
             await using var connection = new NpgsqlConnection(connectionString);
-
-            // Set a reasonable timeout for connection testing
-            connection.CommandTimeout = 10;
 
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 

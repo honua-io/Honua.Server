@@ -336,14 +336,7 @@ public sealed class SqlViewExecutor
             }
         }
 
-        // Check for defined but not referenced parameters (warning, not error)
-        foreach (var param in sqlView.Parameters)
-        {
-            if (!referencedParams.Contains(param.Name))
-            {
-                _logger.LogWarning("SQL view for layer {LayerId} defines parameter {ParameterName} but it is not used in the SQL query", layerId, param.Name);
-            }
-        }
+        // Check for defined but not referenced parameters - no logging in static version
     }
 
     /// <summary>
