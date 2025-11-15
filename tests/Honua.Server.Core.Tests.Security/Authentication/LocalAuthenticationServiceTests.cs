@@ -516,4 +516,68 @@ public class LocalAuthenticationServiceTests
             It.Is<AuditContext>(a => a.ActorId == actorUserId),
             It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithInvalidComplexity_ThrowsException()
+    {
+        // Arrange
+        var targetUserId = "user-123";
+        var actorUserId = "admin-456";
+        var newPassword = "weak";
+
+        var credentials = new AuthUserCredentials(
+            Id: targetUserId,
+            Username: "testuser",
+            Email: null,
+            IsActive: true,
+            IsLocked: false,
+            IsServiceAccount: false,
+            FailedAttempts: 0,
+            LastFailedAt: null,
+            LastLoginAt: null,
+            PasswordChangedAt: null,
+            PasswordExpiresAt: null,
+            PasswordHash: new byte[] { 1, 2, 3 },
+            PasswordSalt: new byte[] { 4, 5, 6 },
+            HashAlgorithm: "Argon2id",
+            HashParameters: "timeCost=4",
+            Roles: new List<string>()
+        );
+
+        _mockRepository.Setup(x => x.GetCredentialsByIdAsync(targetUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(credentials);
+        _mockPasswordValidator.Setup(x => x.Validate(newPassword))
+            .Returns(PasswordComplexityResult.Failure("Password is too weak"));
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.ResetPasswordAsync(targetUserId, newPassword, actorUserId));
+        exception.Message.Should().Contain("too weak");
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_WithNonExistentUser_ThrowsException()
+    {
+        // Arrange
+        var userId = "nonexistent-123";
+        _mockRepository.Setup(x => x.GetCredentialsByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AuthUserCredentials?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _service.ChangePasswordAsync(userId, "oldpass", "newpass"));
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_WithNonExistentUser_ThrowsException()
+    {
+        // Arrange
+        var userId = "nonexistent-123";
+        _mockRepository.Setup(x => x.GetCredentialsByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AuthUserCredentials?)null);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            _service.ResetPasswordAsync(userId, "newpass", "admin"));
+    }
 }

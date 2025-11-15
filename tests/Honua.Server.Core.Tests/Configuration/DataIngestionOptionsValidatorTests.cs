@@ -252,4 +252,85 @@ public class DataIngestionOptionsValidatorTests
         // Assert
         result.Succeeded.Should().BeTrue();
     }
+
+    [Fact]
+    public void Validate_WithNullOptions_ReturnsFail()
+    {
+        // Act
+        var result = _validator.Validate(null, null!);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("cannot be null");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveMaxRetries_ReturnsFail()
+    {
+        // Arrange
+        var options = new DataIngestionOptions
+        {
+            MaxRetries = 11 // Exceeds 10
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("MaxRetries").And.Contain("exceeds");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveBatchTimeout_ReturnsFail()
+    {
+        // Arrange
+        var options = new DataIngestionOptions
+        {
+            BatchTimeout = TimeSpan.FromHours(2) // Exceeds 1 hour
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("BatchTimeout").And.Contain("exceeds");
+    }
+
+    [Fact]
+    public void Validate_WithNegativeTransactionTimeout_ReturnsFail()
+    {
+        // Arrange
+        var options = new DataIngestionOptions
+        {
+            TransactionTimeout = TimeSpan.FromSeconds(-1),
+            UseTransactionalIngestion = true
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("TransactionTimeout").And.Contain("positive");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveTransactionTimeout_ReturnsFail()
+    {
+        // Arrange
+        var options = new DataIngestionOptions
+        {
+            TransactionTimeout = TimeSpan.FromHours(3), // Exceeds 2 hours
+            UseTransactionalIngestion = true
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("TransactionTimeout").And.Contain("exceeds");
+    }
 }

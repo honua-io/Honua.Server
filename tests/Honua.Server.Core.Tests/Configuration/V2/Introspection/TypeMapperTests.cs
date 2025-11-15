@@ -116,4 +116,79 @@ public sealed class TypeMapperTests
         // Assert
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData("mariadb", "int", "int")]
+    [InlineData("mariadb", "bigint", "long")]
+    [InlineData("mariadb", "varchar", "string")]
+    [InlineData("mariadb", "datetime", "datetime")]
+    public void MapToHonuaType_MariaDB_MapsCorrectly(string provider, string dbType, string expected)
+    {
+        // Act
+        var result = TypeMapper.MapToHonuaType(provider, dbType);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("mssql", "int", "int")]
+    [InlineData("mssql", "bigint", "long")]
+    [InlineData("mssql", "nvarchar", "string")]
+    [InlineData("mssql", "bit", "bool")]
+    public void MapToHonuaType_MSSQL_MapsCorrectly(string provider, string dbType, string expected)
+    {
+        // Act
+        var result = TypeMapper.MapToHonuaType(provider, dbType);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("postgresql", "smallint", "int")]
+    [InlineData("postgresql", "int2", "int")]
+    [InlineData("postgresql", "int4", "int")]
+    [InlineData("postgresql", "int8", "long")]
+    [InlineData("postgresql", "float4", "float")]
+    [InlineData("postgresql", "float8", "double")]
+    [InlineData("postgresql", "numeric", "decimal")]
+    [InlineData("postgresql", "decimal", "decimal")]
+    [InlineData("postgresql", "varchar", "string")]
+    [InlineData("postgresql", "char", "string")]
+    [InlineData("postgresql", "timestamptz", "datetimeoffset")]
+    [InlineData("postgresql", "date", "date")]
+    [InlineData("postgresql", "time", "time")]
+    [InlineData("postgresql", "json", "json")]
+    [InlineData("postgresql", "jsonb", "json")]
+    [InlineData("postgresql", "bytea", "binary")]
+    [InlineData("postgresql", "geography", "geometry")]
+    [InlineData("postgresql", "linestring", "geometry")]
+    [InlineData("postgresql", "polygon", "geometry")]
+    [InlineData("postgresql", "multipoint", "geometry")]
+    [InlineData("postgresql", "multilinestring", "geometry")]
+    [InlineData("postgresql", "multipolygon", "geometry")]
+    [InlineData("postgresql", "geometrycollection", "geometry")]
+    public void MapToHonuaType_PostgreSql_AdditionalTypes_MapsCorrectly(string provider, string dbType, string expected)
+    {
+        // Act
+        var result = TypeMapper.MapToHonuaType(provider, dbType);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("line", "LineString")]
+    [InlineData("multiline", "MultiLineString")]
+    [InlineData("geomcollection", "GeometryCollection")]
+    [InlineData("unknown_geom", "Geometry")]
+    public void NormalizeGeometryType_AdditionalFormats_NormalizesCorrectly(string input, string expected)
+    {
+        // Act
+        var result = TypeMapper.NormalizeGeometryType(input);
+
+        // Assert
+        Assert.Equal(expected, result);
+    }
 }

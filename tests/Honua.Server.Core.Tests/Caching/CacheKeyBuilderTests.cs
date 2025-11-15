@@ -146,4 +146,119 @@ public class CacheKeyBuilderTests
         key.Should().NotBeNullOrEmpty();
         key.Should().Contain("query");
     }
+
+    [Fact]
+    public void ForStacCollection_WithoutId_CreatesCollectionsKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForStacCollection()
+            .Build();
+
+        // Assert
+        key.Should().Contain("stac");
+        key.Should().Contain("collections");
+    }
+
+    [Fact]
+    public void ForStacItem_WithoutItemId_CreatesItemsListKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForStacItem("collection1")
+            .Build();
+
+        // Assert
+        key.Should().Contain("stac");
+        key.Should().Contain("collection1");
+        key.Should().Contain("items");
+    }
+
+    [Fact]
+    public void ForStacSearch_CreatesSearchKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForStacSearch()
+            .Build();
+
+        // Assert
+        key.Should().Contain("stac");
+        key.Should().Contain("search");
+    }
+
+    [Fact]
+    public void ForOgcApi_CreatesCorrectKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForOgcApi("features")
+            .Build();
+
+        // Assert
+        key.Should().Contain("ogc");
+        key.Should().Contain("features");
+    }
+
+    [Fact]
+    public void WithTimestamp_AddsTimestampToKey()
+    {
+        // Arrange
+        var timestamp = new DateTimeOffset(2025, 11, 14, 12, 0, 0, TimeSpan.Zero);
+
+        // Act
+        var key = CacheKeyBuilder.ForLayer("service1", "layer1")
+            .WithTimestamp(timestamp)
+            .Build();
+
+        // Assert
+        key.Should().NotBeNullOrEmpty();
+        key.Should().Contain("layer");
+    }
+
+    [Fact]
+    public void Build_CalledTwice_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var builder = CacheKeyBuilder.ForLayer("service1", "layer1");
+        builder.Build();
+
+        // Act
+        var act = () => builder.Build();
+
+        // Assert
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*already been built*");
+    }
+
+    [Fact]
+    public void WithFilter_WithNullOrEmpty_DoesNotAddToKey()
+    {
+        // Arrange & Act
+        var key1 = CacheKeyBuilder.ForQuery("layer1")
+            .WithFilter(null!)
+            .Build();
+
+        var key2 = CacheKeyBuilder.ForQuery("layer1")
+            .WithFilter("")
+            .Build();
+
+        var key3 = CacheKeyBuilder.ForQuery("layer1")
+            .WithFilter("   ")
+            .Build();
+
+        // Assert
+        key1.Should().NotBeNullOrEmpty();
+        key2.Should().NotBeNullOrEmpty();
+        key3.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void WithObjectHash_WithNull_DoesNotAddToKey()
+    {
+        // Arrange & Act
+        var key = CacheKeyBuilder.ForQuery("layer1")
+            .WithObjectHash<object>(null!)
+            .Build();
+
+        // Assert
+        key.Should().NotBeNullOrEmpty();
+        key.Should().Contain("query");
+    }
 }

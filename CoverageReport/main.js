@@ -243,14 +243,14 @@ var assemblies = [
       { "name": "Honua.Server.Core.Authentication.AuthInitializationHostedService", "rp": "Honua.Server.Core_AuthInitializationHostedService.html", "cl": 0, "ucl": 30, "cal": 30, "tl": 58, "cb": 0, "tb": 4, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.JwtBearerOptionsConfigurator", "rp": "Honua.Server.Core_JwtBearerOptionsConfigurator.html", "cl": 0, "ucl": 272, "cal": 272, "tl": 458, "cb": 0, "tb": 98, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.LocalAuthenticationResult", "rp": "Honua.Server.Core_LocalAuthenticationResult.html", "cl": 9, "ucl": 2, "cal": 11, "tl": 339, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Authentication.LocalAuthenticationService", "rp": "Honua.Server.Core_LocalAuthenticationService.html", "cl": 126, "ucl": 49, "cal": 175, "tl": 339, "cb": 58, "tb": 98, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Authentication.LocalAuthenticationService", "rp": "Honua.Server.Core_LocalAuthenticationService.html", "cl": 132, "ucl": 43, "cal": 175, "tl": 339, "cb": 61, "tb": 98, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.LocalSigningKeyProvider", "rp": "Honua.Server.Core_LocalSigningKeyProvider.html", "cl": 0, "ucl": 118, "cal": 118, "tl": 202, "cb": 0, "tb": 38, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.LocalTokenService", "rp": "Honua.Server.Core_LocalTokenService.html", "cl": 0, "ucl": 47, "cal": 47, "tl": 91, "cb": 0, "tb": 14, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.PasswordComplexityResult", "rp": "Honua.Server.Core_PasswordComplexityResult.html", "cl": 3, "ucl": 0, "cal": 3, "tl": 112, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.PasswordComplexityValidator", "rp": "Honua.Server.Core_PasswordComplexityValidator.html", "cl": 58, "ucl": 0, "cal": 58, "tl": 112, "cb": 24, "tb": 24, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.PasswordHasher", "rp": "Honua.Server.Core_PasswordHasher.html", "cl": 121, "ucl": 8, "cal": 129, "tl": 194, "cb": 18, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authentication.PasswordHashResult", "rp": "Honua.Server.Core_PasswordHashResult.html", "cl": 1, "ucl": 0, "cal": 1, "tl": 194, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Authorization.CacheStatistics", "rp": "Honua.Server.Core_CacheStatistics.html", "cl": 0, "ucl": 6, "cal": 6, "tl": 205, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Authorization.CacheStatistics", "rp": "Honua.Server.Core_CacheStatistics.html", "cl": 6, "ucl": 0, "cal": 6, "tl": 205, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.CollectionAuthorizationHandler", "rp": "Honua.Server.Core_CollectionAuthorizationHandler.html", "cl": 87, "ucl": 30, "cal": 117, "tl": 177, "cb": 25, "tb": 48, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.DeleteCollectionAuthorizationHandler", "rp": "Honua.Server.Core_DeleteCollectionAuthorizationHandler.html", "cl": 0, "ucl": 6, "cal": 6, "tl": 163, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.DeleteCollectionRequirement", "rp": "Honua.Server.Core_DeleteCollectionRequirement.html", "cl": 0, "ucl": 1, "cal": 1, "tl": 85, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -263,7 +263,7 @@ var assemblies = [
       { "name": "Honua.Server.Core.Authorization.ReadCollectionRequirement", "rp": "Honua.Server.Core_ReadCollectionRequirement.html", "cl": 0, "ucl": 1, "cal": 1, "tl": 85, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.ReadLayerAuthorizationHandler", "rp": "Honua.Server.Core_ReadLayerAuthorizationHandler.html", "cl": 0, "ucl": 6, "cal": 6, "tl": 163, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.ReadLayerRequirement", "rp": "Honua.Server.Core_ReadLayerRequirement.html", "cl": 0, "ucl": 1, "cal": 1, "tl": 85, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Authorization.ResourceAuthorizationCache", "rp": "Honua.Server.Core_ResourceAuthorizationCache.html", "cl": 3, "ucl": 102, "cal": 105, "tl": 205, "cb": 0, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Authorization.ResourceAuthorizationCache", "rp": "Honua.Server.Core_ResourceAuthorizationCache.html", "cl": 97, "ucl": 8, "cal": 105, "tl": 205, "cb": 22, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.ResourceAuthorizationHandlerBase<T1, T2>", "rp": "Honua.Server.Core_ResourceAuthorizationHandlerBase_2.html", "cl": 0, "ucl": 24, "cal": 24, "tl": 163, "cb": 0, "tb": 6, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.ResourceAuthorizationMetrics", "rp": "Honua.Server.Core_ResourceAuthorizationMetrics.html", "cl": 48, "ucl": 14, "cal": 62, "tl": 117, "cb": 6, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Authorization.ResourceAuthorizationOptions", "rp": "Honua.Server.Core_ResourceAuthorizationOptions.html", "cl": 5, "ucl": 0, "cal": 5, "tl": 171, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -284,11 +284,11 @@ var assemblies = [
       { "name": "Honua.Server.Core.Caching.CacheCircuitBreaker", "rp": "Honua.Server.Core_CacheCircuitBreaker.html", "cl": 0, "ucl": 90, "cal": 90, "tl": 135, "cb": 0, "tb": 8, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheInvalidationPatterns", "rp": "Honua.Server.Core_CacheInvalidationPatterns.html", "cl": 0, "ucl": 21, "cal": 21, "tl": 363, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheKeyBuilder", "rp": "Honua.Server.Core_CacheKeyBuilder.html", "cl": 96, "ucl": 26, "cal": 122, "tl": 328, "cb": 6, "tb": 12, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Caching.CacheKeyGenerator", "rp": "Honua.Server.Core_CacheKeyGenerator.html", "cl": 8, "ucl": 174, "cal": 182, "tl": 433, "cb": 5, "tb": 138, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Caching.CacheKeyGenerator", "rp": "Honua.Server.Core_CacheKeyGenerator.html", "cl": 14, "ucl": 168, "cal": 182, "tl": 433, "cb": 8, "tb": 138, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheKeyNormalizer", "rp": "Honua.Server.Core_CacheKeyNormalizer.html", "cl": 29, "ucl": 182, "cal": 211, "tl": 539, "cb": 25, "tb": 120, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheMetricsCollector", "rp": "Honua.Server.Core_CacheMetricsCollector.html", "cl": 0, "ucl": 159, "cal": 159, "tl": 295, "cb": 0, "tb": 34, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheObservabilityExtensions", "rp": "Honua.Server.Core_CacheObservabilityExtensions.html", "cl": 0, "ucl": 50, "cal": 50, "tl": 693, "cb": 0, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Caching.CacheOptionsBuilder", "rp": "Honua.Server.Core_CacheOptionsBuilder.html", "cl": 0, "ucl": 141, "cal": 141, "tl": 544, "cb": 0, "tb": 24, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Caching.CacheOptionsBuilder", "rp": "Honua.Server.Core_CacheOptionsBuilder.html", "cl": 28, "ucl": 113, "cal": 141, "tl": 544, "cb": 7, "tb": 24, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheSizeLimitOptions", "rp": "Honua.Server.Core_CacheSizeLimitOptions.html", "cl": 6, "ucl": 16, "cal": 22, "tl": 117, "cb": 0, "tb": 10, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheStatisticsSnapshot", "rp": "Honua.Server.Core_CacheStatisticsSnapshot.html", "cl": 0, "ucl": 11, "cal": 11, "tl": 295, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Caching.CacheTtlPolicyExtensions", "rp": "Honua.Server.Core_CacheTtlPolicyExtensions.html", "cl": 31, "ucl": 1, "cal": 32, "tl": 164, "cb": 6, "tb": 7, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -1155,7 +1155,7 @@ var assemblies = [
       { "name": "Honua.Server.Core.Results.Result<T>", "rp": "Honua.Server.Core_Result_1.html", "cl": 0, "ucl": 26, "cal": 26, "tl": 53, "cb": 0, "tb": 2, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.ConnectionStringEncryptionOptions", "rp": "Honua.Server.Core_ConnectionStringEncryptionOptions.html", "cl": 0, "ucl": 45, "cal": 45, "tl": 147, "cb": 0, "tb": 26, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.ConnectionStringEncryptionService", "rp": "Honua.Server.Core_ConnectionStringEncryptionService.html", "cl": 0, "ucl": 87, "cal": 87, "tl": 180, "cb": 0, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Security.ConnectionStringValidator", "rp": "Honua.Server.Core_ConnectionStringValidator.html", "cl": 0, "ucl": 76, "cal": 76, "tl": 164, "cb": 0, "tb": 88, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Security.ConnectionStringValidator", "rp": "Honua.Server.Core_ConnectionStringValidator.html", "cl": 76, "ucl": 0, "cal": 76, "tl": 164, "cb": 88, "tb": 88, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.DataProtectionConfiguration", "rp": "Honua.Server.Core_DataProtectionConfiguration.html", "cl": 0, "ucl": 79, "cal": 79, "tl": 182, "cb": 0, "tb": 22, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.IPNetwork", "rp": "Honua.Server.Core_IPNetwork.html", "cl": 0, "ucl": 51, "cal": 51, "tl": 362, "cb": 0, "tb": 28, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.Secrets.AwsSecretsManagerConfiguration", "rp": "Honua.Server.Core_AwsSecretsManagerConfiguration.html", "cl": 0, "ucl": 8, "cal": 8, "tl": 260, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -1172,7 +1172,7 @@ var assemblies = [
       { "name": "Honua.Server.Core.Security.Secrets.SecretsProviders", "rp": "Honua.Server.Core_SecretsProviders.html", "cl": 0, "ucl": 10, "cal": 10, "tl": 260, "cb": 0, "tb": 0, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.Secrets.SecretsServiceCollectionExtensions", "rp": "Honua.Server.Core_SecretsServiceCollectionExtensions.html", "cl": 0, "ucl": 119, "cal": 119, "tl": 239, "cb": 0, "tb": 26, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.SecurePathValidator", "rp": "Honua.Server.Core_SecurePathValidator.html", "cl": 68, "ucl": 13, "cal": 81, "tl": 192, "cb": 30, "tb": 36, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
-      { "name": "Honua.Server.Core.Security.SqlIdentifierValidator", "rp": "Honua.Server.Core_SqlIdentifierValidator.html", "cl": 108, "ucl": 9, "cal": 117, "tl": 667, "cb": 45, "tb": 52, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
+      { "name": "Honua.Server.Core.Security.SqlIdentifierValidator", "rp": "Honua.Server.Core_SqlIdentifierValidator.html", "cl": 113, "ucl": 4, "cal": 117, "tl": 667, "cb": 50, "tb": 52, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.TrustedProxyValidator", "rp": "Honua.Server.Core_TrustedProxyValidator.html", "cl": 0, "ucl": 145, "cal": 145, "tl": 362, "cb": 0, "tb": 68, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.UrlValidator", "rp": "Honua.Server.Core_UrlValidator.html", "cl": 88, "ucl": 4, "cal": 92, "tl": 196, "cb": 89, "tb": 94, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
       { "name": "Honua.Server.Core.Security.ZipArchiveValidator", "rp": "Honua.Server.Core_ZipArchiveValidator.html", "cl": 0, "ucl": 208, "cal": 208, "tl": 406, "cb": 0, "tb": 92, "cm": 0, "fcm": 0, "tm": 0, "lch": [], "bch": [], "mch": [], "mfch": [], "hc": [], "metrics": { } },
@@ -2210,12 +2210,6 @@ var riskHotspots = [
       { "value": 32, "exceeded": true },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidateProviderSpecific(System.String,System.String)", "methodShortName": "ValidateProviderSpecific(...)", "fileIndex": 0, "line": 85,
-    "metrics": [
-      { "value": 1056, "exceeded": true },
-      { "value": 32, "exceeded": true },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Stac.Cql2.Cql2SqlQueryBuilder", "reportPath": "Honua.Server.Core_Cql2SqlQueryBuilder.html", "methodName": "BuildPropertyRef(Honua.Server.Core.Stac.Cql2.Cql2PropertyRef)", "methodShortName": "BuildPropertyRef(...)", "fileIndex": 0, "line": 409,
     "metrics": [
       { "value": 1056, "exceeded": true },
@@ -2967,12 +2961,6 @@ var riskHotspots = [
     ]},
   {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Query.QueryParameterHelper", "reportPath": "Honua.Server.Core_QueryParameterHelper.html", "methodName": "ParseTemporalRange(System.String)", "methodShortName": "ParseTemporalRange(...)", "fileIndex": 0, "line": 233,
-    "metrics": [
-      { "value": 506, "exceeded": true },
-      { "value": 22, "exceeded": true },
-    ]},
-  {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "Validate(System.String,System.String)", "methodShortName": "Validate(...)", "fileIndex": 0, "line": 22,
     "metrics": [
       { "value": 506, "exceeded": true },
       { "value": 22, "exceeded": true },
@@ -6848,18 +6836,6 @@ var riskHotspots = [
       { "value": 10, "exceeded": false },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidatePostgresConnectionString(System.String)", "methodShortName": "ValidatePostgresConnectionString(...)", "fileIndex": 0, "line": 112,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidateSqliteConnectionString(System.String)", "methodShortName": "ValidateSqliteConnectionString(...)", "fileIndex": 0, "line": 151,
-    "metrics": [
-      { "value": 110, "exceeded": true },
-      { "value": 10, "exceeded": false },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.DataProtectionConfiguration", "reportPath": "Honua.Server.Core_DataProtectionConfiguration.html", "methodName": "ConfigureKeyStorage(Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder,Honua.Server.Core.Security.ConnectionStringEncryptionOptions)", "methodShortName": "ConfigureKeyStorage(...)", "fileIndex": 0, "line": 68,
     "metrics": [
       { "value": 110, "exceeded": true },
@@ -7292,12 +7268,6 @@ var riskHotspots = [
       { "value": 8, "exceeded": false },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Authorization.ResourceAuthorizationCache", "reportPath": "Honua.Server.Core_ResourceAuthorizationCache.html", "methodName": ".ctor(Microsoft.Extensions.Caching.Memory.IMemoryCache,Microsoft.Extensions.Logging.ILogger`1<Honua.Server.Core.Authorization.ResourceAuthorizationCache>,Microsoft.Extensions.Options.IOptionsMonitor`1<Honua.Server.Core.Authorization.ResourceAuthorizationOptions>)", "methodShortName": ".ctor(...)", "fileIndex": 0, "line": 59,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Authorization.ResourceAuthorizationService", "reportPath": "Honua.Server.Core_ResourceAuthorizationService.html", "methodName": "AuthorizeAsync()", "methodShortName": "AuthorizeAsync()", "fileIndex": 0, "line": 59,
     "metrics": [
       { "value": 72, "exceeded": true },
@@ -7317,12 +7287,6 @@ var riskHotspots = [
     ]},
   {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Caching.CacheKeyNormalizer", "reportPath": "Honua.Server.Core_CacheKeyNormalizer.html", "methodName": "IsSafe(System.String)", "methodShortName": "IsSafe(...)", "fileIndex": 0, "line": 439,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Caching.CacheOptionsBuilder", "reportPath": "Honua.Server.Core_CacheOptionsBuilder.html", "methodName": "BuildMemory()", "methodShortName": "BuildMemory()", "fileIndex": 0, "line": 322,
     "metrics": [
       { "value": 72, "exceeded": true },
       { "value": 8, "exceeded": false },
@@ -8666,12 +8630,6 @@ var riskHotspots = [
       { "value": 8, "exceeded": false },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidateMySqlConnectionString(System.String)", "methodShortName": "ValidateMySqlConnectionString(...)", "fileIndex": 0, "line": 126,
-    "metrics": [
-      { "value": 72, "exceeded": true },
-      { "value": 8, "exceeded": false },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.DataProtectionConfiguration", "reportPath": "Honua.Server.Core_DataProtectionConfiguration.html", "methodName": "ConfigureFileSystemStorage(Microsoft.AspNetCore.DataProtection.IDataProtectionBuilder,Honua.Server.Core.Security.ConnectionStringEncryptionOptions)", "methodShortName": "ConfigureFileSystemStorage(...)", "fileIndex": 0, "line": 103,
     "metrics": [
       { "value": 72, "exceeded": true },
@@ -9182,12 +9140,6 @@ var riskHotspots = [
       { "value": 6, "exceeded": false },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Authorization.ResourceAuthorizationCache", "reportPath": "Honua.Server.Core_ResourceAuthorizationCache.html", "methodName": "Set(System.String,Honua.Server.Core.Authorization.ResourceAuthorizationResult)", "methodShortName": "Set(...)", "fileIndex": 0, "line": 85,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Authorization.ResourceAuthorizationService", "reportPath": "Honua.Server.Core_ResourceAuthorizationService.html", "methodName": ".ctor(System.Collections.Generic.IEnumerable`1<Honua.Server.Core.Authorization.IResourceAuthorizationHandler>,Honua.Server.Core.Authorization.IResourceAuthorizationCache,Microsoft.Extensions.Logging.ILogger`1<Honua.Server.Core.Authorization.ResourceAuthorizationService>)", "methodShortName": ".ctor(...)", "fileIndex": 0, "line": 43,
     "metrics": [
       { "value": 42, "exceeded": true },
@@ -9213,12 +9165,6 @@ var riskHotspots = [
     ]},
   {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Caching.CacheKeyGenerator", "reportPath": "Honua.Server.Core_CacheKeyGenerator.html", "methodName": "GenerateMetadataKey(System.String,System.Int32,System.String)", "methodShortName": "GenerateMetadataKey(...)", "fileIndex": 0, "line": 198,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Caching.CacheKeyGenerator", "reportPath": "Honua.Server.Core_CacheKeyGenerator.html", "methodName": "GenerateAuthorizationKeyPrefix(System.String,System.String,System.String)", "methodShortName": "GenerateAuthorizationKeyPrefix(...)", "fileIndex": 0, "line": 269,
     "metrics": [
       { "value": 42, "exceeded": true },
       { "value": 6, "exceeded": false },
@@ -10964,12 +10910,6 @@ var riskHotspots = [
       { "value": 6, "exceeded": false },
     ]},
   {
-    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidateSqlServerConnectionString(System.String)", "methodShortName": "ValidateSqlServerConnectionString(...)", "fileIndex": 0, "line": 139,
-    "metrics": [
-      { "value": 42, "exceeded": true },
-      { "value": 6, "exceeded": false },
-    ]},
-  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.Secrets.AwsSecretsManagerProvider", "reportPath": "Honua.Server.Core_AwsSecretsManagerProvider.html", "methodName": "DeleteSecretAsync()", "methodShortName": "DeleteSecretAsync()", "fileIndex": 0, "line": 242,
     "metrics": [
       { "value": 42, "exceeded": true },
@@ -11474,6 +11414,12 @@ var riskHotspots = [
       { "value": 32, "exceeded": true },
     ]},
   {
+    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "ValidateProviderSpecific(System.String,System.String)", "methodShortName": "ValidateProviderSpecific(...)", "fileIndex": 0, "line": 85,
+    "metrics": [
+      { "value": 32, "exceeded": true },
+      { "value": 32, "exceeded": true },
+    ]},
+  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Configuration.GraphDatabaseOptionsValidator", "reportPath": "Honua.Server.Core_GraphDatabaseOptionsValidator.html", "methodName": "Validate(System.String,Honua.Server.Core.Configuration.GraphDatabaseOptions)", "methodShortName": "Validate(...)", "fileIndex": 0, "line": 16,
     "metrics": [
       { "value": 30, "exceeded": false },
@@ -11510,6 +11456,12 @@ var riskHotspots = [
       { "value": 22, "exceeded": true },
     ]},
   {
+    "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.ConnectionStringValidator", "reportPath": "Honua.Server.Core_ConnectionStringValidator.html", "methodName": "Validate(System.String,System.String)", "methodShortName": "Validate(...)", "fileIndex": 0, "line": 22,
+    "metrics": [
+      { "value": 22, "exceeded": false },
+      { "value": 22, "exceeded": true },
+    ]},
+  {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Configuration.V2.Validation.SemanticValidator", "reportPath": "Honua.Server.Core_SemanticValidator.html", "methodName": "ValidateCacheReferences(Honua.Server.Core.Configuration.V2.HonuaConfig,Honua.Server.Core.Configuration.V2.Validation.ValidationResult)", "methodShortName": "ValidateCacheReferences(...)", "fileIndex": 0, "line": 134,
     "metrics": [
       { "value": 20, "exceeded": false },
@@ -11518,7 +11470,7 @@ var riskHotspots = [
   {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Security.SqlIdentifierValidator", "reportPath": "Honua.Server.Core_SqlIdentifierValidator.html", "methodName": "UnquoteIdentifier(System.String)", "methodShortName": "UnquoteIdentifier(...)", "fileIndex": 1, "line": 235,
     "metrics": [
-      { "value": 28, "exceeded": false },
+      { "value": 21, "exceeded": false },
       { "value": 20, "exceeded": true },
     ]},
   {
@@ -11536,7 +11488,7 @@ var riskHotspots = [
   {
     "assembly": "Honua.Server.Core", "class": "Honua.Server.Core.Authentication.LocalAuthenticationService", "reportPath": "Honua.Server.Core_LocalAuthenticationService.html", "methodName": "ChangePasswordAsync()", "methodShortName": "ChangePasswordAsync()", "fileIndex": 0, "line": 196,
     "metrics": [
-      { "value": 18, "exceeded": false },
+      { "value": 17, "exceeded": false },
       { "value": 16, "exceeded": true },
     ]},
   {
