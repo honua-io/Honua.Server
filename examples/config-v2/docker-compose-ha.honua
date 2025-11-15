@@ -1,0 +1,90 @@
+# Docker Compose Configuration with Leader Election
+# Example: Multi-instance deployment with HA
+
+honua {
+  version     = "1.0"
+  environment = "development"
+  log_level   = "information"
+
+  # Enable high availability
+  high_availability {
+    enabled = true
+
+    leader_election {
+      enabled                  = true
+      resource_name            = "honua-server"
+      lease_duration_seconds   = 30
+      renewal_interval_seconds = 10
+      key_prefix               = "honua:leader:"
+      enable_detailed_logging  = true  # Enable for development
+    }
+  }
+
+  cors {
+    allow_any_origin = true  # Development only!
+  }
+}
+
+# PostgreSQL data source
+data_source "postgres_dev" {
+  provider   = "postgresql"
+  connection = env("DATABASE_URL")  # From docker-compose environment
+
+  pool {
+    min_size = 2
+    max_size = 20
+  }
+
+  health_check = "SELECT 1"
+}
+
+# Redis cache (required for leader election)
+cache "redis_dev" {
+  enabled    = true
+  connection = env("REDIS_URL")  # From docker-compose: "redis:6379"
+  prefix     = "dev:"
+  ttl        = 600
+}
+
+# Enable services
+service "ogc_api" {
+  enabled     = true
+  conformance = ["core", "geojson", "crs"]
+}
+
+service "wfs" {
+  enabled = true
+  version = "2.0.0"
+}
+
+# Sample layer
+layer "test_features" {
+  title             = "Test Features"
+  data_source       = data_source.postgres_dev
+  table             = "public.test_features"
+  id_field          = "id"
+  display_field     = "name"
+  introspect_fields = true
+
+  geometry {
+    column = "geom"
+    type   = "Point"
+    srid   = 4326
+  }
+
+  services = [
+    service.ogc_api,
+    service.wfs
+  ]
+}
+
+# Logging configuration
+logging {
+  level = "information"
+
+  # Detailed logging for leader election in development
+  overrides {
+    "Honua.Server.Core.Coordination" = "debug"
+    "Honua.Server.Intake"             = "information"
+  }
+}

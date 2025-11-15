@@ -72,7 +72,42 @@ Without leader election, all instances would attempt these operations simultaneo
 
 ## Configuration
 
-Add the `LeaderElection` section to your `appsettings.json`:
+### Using Configuration V2 (HCL - Recommended)
+
+Add the leader election configuration to your `.honua` configuration file:
+
+```hcl
+honua {
+  version     = "1.0"
+  environment = "production"
+
+  high_availability {
+    enabled = true
+
+    leader_election {
+      enabled                  = true
+      resource_name            = "honua-server"
+      lease_duration_seconds   = 30
+      renewal_interval_seconds = 10
+      key_prefix               = "honua:leader:"
+      enable_detailed_logging  = false
+    }
+  }
+}
+
+# Redis cache (required for leader election)
+cache "redis" {
+  enabled    = true
+  connection = env("REDIS_CONNECTION_STRING")
+  prefix     = "honua:"
+}
+```
+
+See `leader-election.example.honua` for more examples.
+
+### Using appsettings.json (Legacy)
+
+If you're not yet using Configuration V2, add to `appsettings.json`:
 
 ```json
 {
@@ -82,6 +117,9 @@ Add the `LeaderElection` section to your `appsettings.json`:
     "RenewalIntervalSeconds": 10,
     "KeyPrefix": "honua:leader:",
     "EnableDetailedLogging": false
+  },
+  "Redis": {
+    "ConnectionString": "localhost:6379"
   }
 }
 ```

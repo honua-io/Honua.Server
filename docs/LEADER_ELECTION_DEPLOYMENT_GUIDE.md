@@ -12,6 +12,41 @@ This guide walks through deploying the Redis-based leader election infrastructur
 
 ### 1. Update Configuration
 
+#### Option A: Configuration V2 (HCL - Recommended)
+
+Add to your `.honua` configuration file:
+
+```hcl
+honua {
+  version     = "1.0"
+  environment = "production"
+
+  high_availability {
+    enabled = true
+
+    leader_election {
+      enabled                  = true
+      resource_name            = "honua-server"
+      lease_duration_seconds   = 30
+      renewal_interval_seconds = 10
+      key_prefix               = "honua:leader:"
+      enable_detailed_logging  = false
+    }
+  }
+}
+
+# Redis cache (required for leader election)
+cache "redis" {
+  enabled    = true
+  connection = env("REDIS_CONNECTION_STRING")
+  prefix     = "honua:"
+}
+```
+
+See `examples/config-v2/docker-compose-ha.honua` or `kubernetes-ha.honua` for complete examples.
+
+#### Option B: appsettings.json (Legacy)
+
 Add to your `appsettings.json`:
 
 ```json
@@ -59,81 +94,96 @@ curl http://instance3:8080/health | jq '.results.leader_election'
 
 ## Production Configuration
 
-### Environment-Specific Settings
+### Environment-Specific Settings (HCL)
 
 **Development**:
-```json
-{
-  "LeaderElection": {
-    "LeaseDurationSeconds": 15,
-    "RenewalIntervalSeconds": 5,
-    "EnableDetailedLogging": true
+```hcl
+high_availability {
+  leader_election {
+    lease_duration_seconds   = 15
+    renewal_interval_seconds = 5
+    enable_detailed_logging  = true
   }
 }
 ```
 
 **Production**:
-```json
-{
-  "LeaderElection": {
-    "LeaseDurationSeconds": 30,
-    "RenewalIntervalSeconds": 10,
-    "EnableDetailedLogging": false
+```hcl
+high_availability {
+  leader_election {
+    lease_duration_seconds   = 30
+    renewal_interval_seconds = 10
+    enable_detailed_logging  = false
   }
 }
 ```
 
 **High-Load Production**:
-```json
-{
-  "LeaderElection": {
-    "LeaseDurationSeconds": 60,
-    "RenewalIntervalSeconds": 15,
-    "EnableDetailedLogging": false
+```hcl
+high_availability {
+  leader_election {
+    lease_duration_seconds   = 60
+    renewal_interval_seconds = 15
+    enable_detailed_logging  = false
   }
 }
 ```
 
-### Redis High Availability
+### Redis High Availability (HCL)
 
 #### Option 1: Redis Sentinel (Recommended)
 
-```json
-{
-  "Redis": {
-    "ConnectionString": "sentinel1:26379,sentinel2:26379,sentinel3:26379,serviceName=mymaster,password=your-password,ssl=true"
-  }
+```hcl
+cache "redis" {
+  enabled    = true
+  connection = "sentinel1:26379,sentinel2:26379,sentinel3:26379,serviceName=mymaster,password=your-password,ssl=true"
+  prefix     = "honua:"
+}
+```
+
+Or use environment variable:
+```hcl
+cache "redis" {
+  enabled    = true
+  connection = env("REDIS_CONNECTION_STRING")  # Set via environment
+  prefix     = "honua:"
 }
 ```
 
 #### Option 2: Redis Cluster
 
-```json
-{
-  "Redis": {
-    "ConnectionString": "node1:6379,node2:6379,node3:6379,password=your-password,ssl=true"
-  }
+```hcl
+cache "redis" {
+  enabled    = true
+  connection = "node1:6379,node2:6379,node3:6379,password=your-password,ssl=true"
+  prefix     = "honua:"
 }
 ```
 
 #### Option 3: Azure Redis Cache
 
-```json
-{
-  "Redis": {
-    "ConnectionString": "your-redis.redis.cache.windows.net:6380,password=your-access-key,ssl=true,abortConnect=false"
-  }
+```hcl
+cache "redis" {
+  enabled    = true
+  connection = env("AZURE_REDIS_CONNECTION_STRING")
+  prefix     = "honua:"
 }
+
+# Set environment variable:
+# AZURE_REDIS_CONNECTION_STRING=your-redis.redis.cache.windows.net:6380,password=your-access-key,ssl=true,abortConnect=false
 ```
 
 #### Option 4: AWS ElastiCache
 
-```json
-{
-  "Redis": {
-    "ConnectionString": "your-cluster.cache.amazonaws.com:6379,ssl=true"
-  }
+```hcl
+cache "redis" {
+  enabled    = true
+  connection = env("AWS_REDIS_ENDPOINT")
+  prefix     = "honua:"
 }
+
+# Set environment variable:
+# AWS_REDIS_ENDPOINT=your-cluster.cache.amazonaws.com:6379,ssl=true
 ```
 
 ## Kubernetes Deployment
