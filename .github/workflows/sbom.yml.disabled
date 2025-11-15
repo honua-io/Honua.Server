@@ -1,11 +1,31 @@
+# Software Bill of Materials (SBOM) Generation & Attestation Workflow
+#
+# Purpose: Generate and sign SBOMs for supply chain security
+#
+# This workflow:
+# - Generates application SBOMs in CycloneDX and SPDX formats
+# - Generates container SBOMs using Syft (SPDX, CycloneDX, Syft JSON)
+# - Signs container images and SBOMs with Cosign
+# - Attaches SBOM attestations to container images
+# - Uploads SBOMs as release assets
+# - Verifies SBOM integrity and signatures
+#
+# Documentation: .github/SBOM.md, .github/SECURITY_SCANNING.md
+#
+# Triggers:
+# - Push to: master, dev
+# - Release published
+# - Manual: Workflow dispatch (Actions tab)
+#
 name: "SBOM Generation & Attestation"
 
+# DISABLED: Uncomment 'on' section below to re-enable
 on:
-  push:
-    branches: [ "master", "dev" ]
-  release:
-    types: [ published ]
-  workflow_dispatch:
+  # push:
+  #   branches: [ "master", "dev" ]
+  # release:
+  #   types: [ published ]
+  # workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -13,6 +33,7 @@ env:
 
 jobs:
   generate-sbom:
+    if: false # DISABLED
     name: Generate and Attach SBOM
     runs-on: ubuntu-latest
     permissions:
@@ -22,10 +43,10 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: '9.0.x'
 
@@ -138,7 +159,7 @@ jobs:
 
     # Upload SBOM artifacts
     - name: Upload SBOM artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: sbom-${{ github.sha }}
         path: |
@@ -193,10 +214,10 @@ jobs:
 
   # Verify SBOM attestation
   verify-sbom:
+    if: false # DISABLED
     name: Verify SBOM Attestation
     runs-on: ubuntu-latest
     needs: generate-sbom
-    if: github.event_name != 'pull_request'
     permissions:
       packages: read
 

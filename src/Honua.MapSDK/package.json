@@ -10,19 +10,19 @@
   },
   "dependencies": {
     "@deck.gl/core": "^8.9.33",
-    "@deck.gl/layers": "^8.9.33",
-    "@deck.gl/geo-layers": "^8.9.33",
-    "@deck.gl/mesh-layers": "^8.9.33",
+    "@deck.gl/layers": "^9.2.2",
+    "@deck.gl/geo-layers": "^9.2.2",
+    "@deck.gl/mesh-layers": "^9.2.2",
     "@deck.gl/aggregation-layers": "^8.9.33",
     "@deck.gl/mapbox": "^8.9.33",
     "@loaders.gl/gltf": "^4.0.4",
     "@turf/turf": "^7.1.0",
-    "earcut": "^2.2.4",
+    "earcut": "^3.0.2",
     "sql.js": "^1.8.0",
     "supercluster": "^8.0.1"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
+    "jest": "^30.2.0",
     "jest-environment-jsdom": "^29.7.0"
   },
   "jest": {
