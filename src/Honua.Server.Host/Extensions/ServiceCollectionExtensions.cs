@@ -82,6 +82,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Ogc.Services.IOgcTilesHandler, Ogc.Services.OgcTilesHandler>();
         services.AddSingleton<Ogc.Services.IOgcFeaturesRenderingHandler, Ogc.Services.OgcFeaturesRenderingHandler>();
 
+        // Register Phase 1.4 refactored services (breaking up OgcSharedHandlers)
+        services.AddSingleton<Ogc.Services.OgcResponseBuilder>();
+        services.AddSingleton<Ogc.Services.IOgcConformanceService, Ogc.Services.ConformanceService>();
+        services.AddSingleton<Ogc.Services.IOgcLandingPageService, Ogc.Services.LandingPageService>();
+        services.AddSingleton<Ogc.Services.IOgcCollectionService, Ogc.Services.CollectionService>();
+
         // Register filter parsing cache (performance optimization)
         services.AddOptions<Ogc.Services.FilterParsingCacheOptions>()
             .Bind(configuration.GetSection("FilterParsingCache"))

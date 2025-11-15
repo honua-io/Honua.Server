@@ -46,6 +46,21 @@ using NetTopologySuite.IO;
 
 namespace Honua.Server.Host.Ogc;
 
+/// <summary>
+/// Shared handlers and utilities for OGC API endpoints.
+/// </summary>
+/// <remarks>
+/// This class is being refactored as part of Phase 1.4 architecture improvements.
+/// New code should use the service classes in the Services namespace:
+/// - <see cref="Services.IOgcConformanceService"/> for conformance operations
+/// - <see cref="Services.IOgcLandingPageService"/> for landing page and API definition
+/// - <see cref="Services.IOgcCollectionService"/> for collection operations
+/// - <see cref="Services.OgcLinkBuilder"/> for link building
+/// - <see cref="Services.OgcResponseBuilder"/> for response utilities
+///
+/// This class is maintained for backward compatibility and will delegate to the new services.
+/// </remarks>
+[Obsolete("This static class is being refactored into properly structured services. Use the service classes in Services namespace instead. This class remains functional as a facade for backward compatibility.")]
 internal static partial class OgcSharedHandlers
 {
     private const string CollectionIdSeparator = "::";

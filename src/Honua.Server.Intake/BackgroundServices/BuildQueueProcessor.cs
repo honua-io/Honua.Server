@@ -6,6 +6,7 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Honua.Server.Core.Coordination;
 using Honua.Server.Intake.Configuration;
 using Honua.Server.Intake.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,12 +21,14 @@ namespace Honua.Server.Intake.BackgroundServices;
 /// <summary>
 /// Background service that processes builds from the queue asynchronously.
 /// Handles concurrent build execution, progress tracking, failure retry, and notifications.
+/// Uses leader election in HA deployments to ensure only one instance processes builds.
 /// </summary>
 public sealed class BuildQueueProcessor : BackgroundService
 {
     private readonly IServiceProvider serviceProvider;
     private readonly BuildQueueOptions options;
     private readonly ILogger<BuildQueueProcessor> logger;
+    private readonly LeaderElectionService? leaderElectionService;
     private readonly SemaphoreSlim concurrencySemaphore;
     private readonly ResiliencePipeline retryPipeline;
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -34,11 +37,13 @@ public sealed class BuildQueueProcessor : BackgroundService
     public BuildQueueProcessor(
         IServiceProvider serviceProvider,
         IOptions<BuildQueueOptions> options,
-        ILogger<BuildQueueProcessor> logger)
+        ILogger<BuildQueueProcessor> logger,
+        LeaderElectionService? leaderElectionService = null)
     {
         this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         this.options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        this.leaderElectionService = leaderElectionService;
 
         this.options.Validate();
 
@@ -59,14 +64,24 @@ public sealed class BuildQueueProcessor : BackgroundService
             })
             .Build();
 
-        this.logger.LogInformation(
-            "BuildQueueProcessor initialized: MaxConcurrent={MaxConcurrent}, PollInterval={PollInterval}s, BuildTimeout={Timeout}min",
-            this.options.MaxConcurrentBuilds, this.options.PollIntervalSeconds, this.options.BuildTimeoutMinutes);
+        if (this.leaderElectionService != null)
+        {
+            this.logger.LogInformation(
+                "BuildQueueProcessor initialized with leader election: InstanceId={InstanceId}, MaxConcurrent={MaxConcurrent}, PollInterval={PollInterval}s, BuildTimeout={Timeout}min",
+                this.leaderElectionService.InstanceId, this.options.MaxConcurrentBuilds, this.options.PollIntervalSeconds, this.options.BuildTimeoutMinutes);
+        }
+        else
+        {
+            this.logger.LogInformation(
+                "BuildQueueProcessor initialized (single instance mode): MaxConcurrent={MaxConcurrent}, PollInterval={PollInterval}s, BuildTimeout={Timeout}min",
+                this.options.MaxConcurrentBuilds, this.options.PollIntervalSeconds, this.options.BuildTimeoutMinutes);
+        }
     }
 
     /// <summary>
     /// Main execution loop for the background service.
     /// Continuously polls for pending builds and processes them concurrently.
+    /// In HA deployments, only processes when this instance is the leader.
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -80,6 +95,26 @@ public sealed class BuildQueueProcessor : BackgroundService
         {
             try
             {
+                // Check if leader election is enabled
+                if (this.leaderElectionService != null)
+                {
+                    // Only process if this instance is the leader
+                    if (!this.leaderElectionService.IsLeader)
+                    {
+                        // Not leader - wait and check again
+                        this.logger.LogDebug(
+                            "This instance is not the leader (InstanceId={InstanceId}), waiting before checking again",
+                            this.leaderElectionService.InstanceId);
+
+                        await Task.Delay(TimeSpan.FromSeconds(this.options.PollIntervalSeconds), stoppingToken);
+                        continue;
+                    }
+
+                    this.logger.LogDebug(
+                        "Processing builds as leader (InstanceId={InstanceId})",
+                        this.leaderElectionService.InstanceId);
+                }
+
                 using var scope = this.serviceProvider.CreateScope();
                 var queueManager = scope.ServiceProvider.GetRequiredService<IBuildQueueManager>();
 
@@ -88,6 +123,16 @@ public sealed class BuildQueueProcessor : BackgroundService
 
                 if (job != null)
                 {
+                    // Double-check leadership before processing (in case we lost it during GetNextBuildAsync)
+                    if (this.leaderElectionService != null && !this.leaderElectionService.IsLeader)
+                    {
+                        this.logger.LogWarning(
+                            "Lost leadership while retrieving build job {JobId}, skipping processing",
+                            job.Id);
+                        await Task.Delay(TimeSpan.FromSeconds(this.options.PollIntervalSeconds), stoppingToken);
+                        continue;
+                    }
+
                     this.logger.LogInformation(
                         "Found pending build job {JobId} for customer {CustomerId} (priority: {Priority})",
                         job.Id, job.CustomerId, job.Priority);
