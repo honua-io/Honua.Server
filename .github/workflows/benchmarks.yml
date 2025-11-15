@@ -52,7 +52,7 @@ jobs:
           dotnet run -c Release --no-build --exporters json markdown html
 
       - name: Store benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-results-${{ github.sha }}
           path: benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/results/
@@ -129,7 +129,7 @@ jobs:
           dotnet run -c Release --no-build --filter *Intersection_Small* --exporters markdown
 
       - name: Upload quick results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: quick-benchmark-results-${{ github.sha }}
           path: benchmarks/Honua.Benchmarks/BenchmarkDotNet.Artifacts/results/
