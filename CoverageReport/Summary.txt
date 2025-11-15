@@ -1,25 +1,25 @@
 Summary
-  Generated on: 11/14/2025 - 13:30:38
-  Coverage date: 11/14/2025 - 13:29:10 - 11/14/2025 - 13:29:43
-  Parser: MultiReport (4x Cobertura)
+  Generated on: 11/14/2025 - 14:22:03
+  Coverage date: 11/14/2025 - 13:29:10 - 11/14/2025 - 14:21:34
+  Parser: MultiReport (19x Cobertura)
   Assemblies: 1
   Classes: 1089
   Files: 747
-  Line coverage: 3.9%
-  Covered lines: 4375
-  Uncovered lines: 105533
+  Line coverage: 4.1%
+  Covered lines: 4596
+  Uncovered lines: 105312
   Coverable lines: 109908
   Total lines: 177129
-  Branch coverage: 5.2% (1821 of 34415)
-  Covered branches: 1821
+  Branch coverage: 5.6% (1949 of 34415)
+  Covered branches: 1949
   Total branches: 34415
-  Method coverage: 5.7% (569 of 9838)
-  Full method coverage: 4.5% (451 of 9838)
-  Covered methods: 569
-  Fully covered methods: 451
+  Method coverage: 6% (592 of 9838)
+  Full method coverage: 4.7% (470 of 9838)
+  Covered methods: 592
+  Fully covered methods: 470
   Total methods: 9838
 
-Honua.Server.Core                                                                                                                                               3.9%
+Honua.Server.Core                                                                                                                                               4.1%
   Honua.Server.Core.Attachments.AddFeatureAttachmentRequest                                                                                                       0%
   Honua.Server.Core.Attachments.AttachmentDescriptor                                                                                                              0%
   Honua.Server.Core.Attachments.AttachmentPointer                                                                                                                 0%
@@ -50,14 +50,14 @@ Honua.Server.Core                                                               
   Honua.Server.Core.Authentication.AuthInitializationHostedService                                                                                                0%
   Honua.Server.Core.Authentication.JwtBearerOptionsConfigurator                                                                                                   0%
   Honua.Server.Core.Authentication.LocalAuthenticationResult                                                                                                   81.8%
-  Honua.Server.Core.Authentication.LocalAuthenticationService                                                                                                    72%
+  Honua.Server.Core.Authentication.LocalAuthenticationService                                                                                                  75.4%
   Honua.Server.Core.Authentication.LocalSigningKeyProvider                                                                                                        0%
   Honua.Server.Core.Authentication.LocalTokenService                                                                                                              0%
   Honua.Server.Core.Authentication.PasswordComplexityResult                                                                                                     100%
   Honua.Server.Core.Authentication.PasswordComplexityValidator                                                                                                  100%
   Honua.Server.Core.Authentication.PasswordHasher                                                                                                              93.7%
   Honua.Server.Core.Authentication.PasswordHashResult                                                                                                           100%
-  Honua.Server.Core.Authorization.CacheStatistics                                                                                                                 0%
+  Honua.Server.Core.Authorization.CacheStatistics                                                                                                               100%
   Honua.Server.Core.Authorization.CollectionAuthorizationHandler                                                                                               74.3%
   Honua.Server.Core.Authorization.DeleteCollectionAuthorizationHandler                                                                                            0%
   Honua.Server.Core.Authorization.DeleteCollectionRequirement                                                                                                     0%
@@ -70,7 +70,7 @@ Honua.Server.Core                                                               
   Honua.Server.Core.Authorization.ReadCollectionRequirement                                                                                                       0%
   Honua.Server.Core.Authorization.ReadLayerAuthorizationHandler                                                                                                   0%
   Honua.Server.Core.Authorization.ReadLayerRequirement                                                                                                            0%
-  Honua.Server.Core.Authorization.ResourceAuthorizationCache                                                                                                    2.8%
+  Honua.Server.Core.Authorization.ResourceAuthorizationCache                                                                                                   92.3%
   Honua.Server.Core.Authorization.ResourceAuthorizationHandlerBase<T1, T2>                                                                                        0%
   Honua.Server.Core.Authorization.ResourceAuthorizationMetrics                                                                                                 77.4%
   Honua.Server.Core.Authorization.ResourceAuthorizationOptions                                                                                                  100%
@@ -91,11 +91,11 @@ Honua.Server.Core                                                               
   Honua.Server.Core.Caching.CacheCircuitBreaker                                                                                                                   0%
   Honua.Server.Core.Caching.CacheInvalidationPatterns                                                                                                             0%
   Honua.Server.Core.Caching.CacheKeyBuilder                                                                                                                    78.6%
-  Honua.Server.Core.Caching.CacheKeyGenerator                                                                                                                   4.3%
+  Honua.Server.Core.Caching.CacheKeyGenerator                                                                                                                   7.6%
   Honua.Server.Core.Caching.CacheKeyNormalizer                                                                                                                 13.7%
   Honua.Server.Core.Caching.CacheMetricsCollector                                                                                                                 0%
   Honua.Server.Core.Caching.CacheObservabilityExtensions                                                                                                          0%
-  Honua.Server.Core.Caching.CacheOptionsBuilder                                                                                                                   0%
+  Honua.Server.Core.Caching.CacheOptionsBuilder                                                                                                                19.8%
   Honua.Server.Core.Caching.CacheSizeLimitOptions                                                                                                              27.2%
   Honua.Server.Core.Caching.CacheStatisticsSnapshot                                                                                                               0%
   Honua.Server.Core.Caching.CacheTtlPolicyExtensions                                                                                                           96.8%
@@ -962,7 +962,7 @@ Honua.Server.Core                                                               
   Honua.Server.Core.Results.Result<T>                                                                                                                             0%
   Honua.Server.Core.Security.ConnectionStringEncryptionOptions                                                                                                    0%
   Honua.Server.Core.Security.ConnectionStringEncryptionService                                                                                                    0%
-  Honua.Server.Core.Security.ConnectionStringValidator                                                                                                            0%
+  Honua.Server.Core.Security.ConnectionStringValidator                                                                                                          100%
   Honua.Server.Core.Security.DataProtectionConfiguration                                                                                                          0%
   Honua.Server.Core.Security.IPNetwork                                                                                                                            0%
   Honua.Server.Core.Security.Secrets.AwsSecretsManagerConfiguration                                                                                               0%
@@ -979,7 +979,7 @@ Honua.Server.Core                                                               
   Honua.Server.Core.Security.Secrets.SecretsProviders                                                                                                             0%
   Honua.Server.Core.Security.Secrets.SecretsServiceCollectionExtensions                                                                                           0%
   Honua.Server.Core.Security.SecurePathValidator                                                                                                               83.9%
-  Honua.Server.Core.Security.SqlIdentifierValidator                                                                                                            92.3%
+  Honua.Server.Core.Security.SqlIdentifierValidator                                                                                                            96.5%
   Honua.Server.Core.Security.TrustedProxyValidator                                                                                                                0%
   Honua.Server.Core.Security.UrlValidator                                                                                                                      95.6%
   Honua.Server.Core.Security.ZipArchiveValidator                                                                                                                  0%

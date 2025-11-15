@@ -285,4 +285,271 @@ public class SqlIdentifierValidatorTests
         // Assert
         exception.Should().BeNull();
     }
+
+    [Fact]
+    public void TryValidateIdentifier_WithNullIdentifier_ReturnsFalseWithMessage()
+    {
+        // Act
+        var isValid = SqlIdentifierValidator.TryValidateIdentifier(null!, out var errorMessage);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("cannot be null or whitespace");
+    }
+
+    [Fact]
+    public void TryValidateIdentifier_WithEmptyAfterSplit_ReturnsFalseWithMessage()
+    {
+        // Arrange
+        var identifier = "...";
+
+        // Act
+        var isValid = SqlIdentifierValidator.TryValidateIdentifier(identifier, out var errorMessage);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("cannot be empty after splitting");
+    }
+
+    [Fact]
+    public void TryValidateIdentifier_WithTooLongPart_ReturnsFalseWithMessage()
+    {
+        // Arrange
+        var longPart = new string('a', SqlIdentifierValidator.MaxIdentifierLength + 1);
+        var identifier = $"schema.{longPart}";
+
+        // Act
+        var isValid = SqlIdentifierValidator.TryValidateIdentifier(identifier, out var errorMessage);
+
+        // Assert
+        isValid.Should().BeFalse();
+        errorMessage.Should().Contain("exceeds maximum length");
+    }
+
+    [Fact]
+    public void ValidateAndQuotePostgres_WithThreePartQualifiedName_QuotesAllParts()
+    {
+        // Arrange
+        var identifier = "database.schema.table";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuotePostgres(identifier);
+
+        // Assert
+        result.Should().Be("\"database\".\"schema\".\"table\"");
+    }
+
+    [Fact]
+    public void ValidateAndQuoteMySql_WithEmbeddedBackticks_EscapesBackticks()
+    {
+        // Arrange
+        var identifier = "`table`name`";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteMySql(identifier);
+
+        // Assert
+        result.Should().Contain("``"); // Backticks should be escaped by doubling
+    }
+
+    [Fact]
+    public void ValidateAndQuotePostgres_WithDoubleQuotesInside_EscapesCorrectly()
+    {
+        // Arrange - identifier with embedded quote
+        var identifier = "table\"name";
+
+        // Act
+        var exception = Record.Exception(() => SqlIdentifierValidator.ValidateAndQuotePostgres(identifier));
+
+        // Assert
+        exception.Should().NotBeNull(); // Should fail validation for unquoted identifier with special chars
+    }
+
+    [Fact]
+    public void ValidateAndQuoteSqlite_WorksLikePostgres()
+    {
+        // Arrange
+        var identifier = "table_name";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteSqlite(identifier);
+
+        // Assert - SQLite uses same quoting as Postgres
+        result.Should().Be("\"table_name\"");
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithQuotedMySqlIdentifier_AcceptsIt()
+    {
+        // Arrange
+        var identifier = "`table_name`";
+
+        // Act
+        var exception = Record.Exception(() => SqlIdentifierValidator.ValidateIdentifier(identifier));
+
+        // Assert
+        exception.Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithQuotedSqlServerIdentifier_AcceptsIt()
+    {
+        // Arrange
+        var identifier = "[table_name]";
+
+        // Act
+        var exception = Record.Exception(() => SqlIdentifierValidator.ValidateIdentifier(identifier));
+
+        // Assert
+        exception.Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithQuotedPostgresIdentifier_AcceptsIt()
+    {
+        // Arrange
+        var identifier = "\"table_name\"";
+
+        // Act
+        var exception = Record.Exception(() => SqlIdentifierValidator.ValidateIdentifier(identifier));
+
+        // Assert
+        exception.Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithMalformedQuotedIdentifier_Throws()
+    {
+        // Arrange - opening quote but no closing quote
+        var identifier = "\"table_name";
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateIdentifier(identifier));
+        exception.Message.Should().Contain("invalid characters");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ValidateAndQuotePostgres_WithInvalidIdentifier_Throws(string? identifier)
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateAndQuotePostgres(identifier!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ValidateAndQuoteMySql_WithInvalidIdentifier_Throws(string? identifier)
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateAndQuoteMySql(identifier!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ValidateAndQuoteSqlServer_WithInvalidIdentifier_Throws(string? identifier)
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateAndQuoteSqlServer(identifier!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ValidateAndQuoteSqlite_WithInvalidIdentifier_Throws(string? identifier)
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateAndQuoteSqlite(identifier!));
+    }
+
+    [Fact]
+    public void ValidateAndQuotePostgres_WithQualifiedNameContainingQuotes_EscapesQuotes()
+    {
+        // Arrange
+        var identifier = "\"schema\".\"table\"";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuotePostgres(identifier);
+
+        // Assert
+        result.Should().Be("\"schema\".\"table\"");
+    }
+
+    [Fact]
+    public void ValidateAndQuoteMySql_WithQualifiedNameContainingBackticks_EscapesBackticks()
+    {
+        // Arrange
+        var identifier = "`database`.`table`";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteMySql(identifier);
+
+        // Assert
+        result.Should().Be("`database`.`table`");
+    }
+
+    [Fact]
+    public void ValidateAndQuoteSqlServer_WithQualifiedNameContainingBrackets_EscapesBrackets()
+    {
+        // Arrange
+        var identifier = "[schema].[table]";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteSqlServer(identifier);
+
+        // Assert
+        result.Should().Be("[schema].[table]");
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithCustomParameterName_UsesParameterNameInException()
+    {
+        // Arrange
+        var identifier = "invalid-name";
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => SqlIdentifierValidator.ValidateIdentifier(identifier, "customParam"));
+        exception.ParamName.Should().Be("customParam");
+    }
+
+    [Fact]
+    public void ValidateIdentifier_WithSpecialCharactersInQuotedIdentifier_Passes()
+    {
+        // Arrange - already quoted identifiers can contain special chars
+        var identifier = "\"table-with-dash\"";
+
+        // Act
+        var exception = Record.Exception(() => SqlIdentifierValidator.ValidateIdentifier(identifier));
+
+        // Assert
+        exception.Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateAndQuoteMySql_WithTriplePartName_QuotesAllParts()
+    {
+        // Arrange
+        var identifier = "server.database.table";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteMySql(identifier);
+
+        // Assert
+        result.Should().Be("`server`.`database`.`table`");
+    }
+
+    [Fact]
+    public void ValidateAndQuoteSqlServer_WithTriplePartName_QuotesAllParts()
+    {
+        // Arrange
+        var identifier = "server.database.table";
+
+        // Act
+        var result = SqlIdentifierValidator.ValidateAndQuoteSqlServer(identifier);
+
+        // Assert
+        result.Should().Be("[server].[database].[table]");
+    }
 }

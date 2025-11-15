@@ -172,7 +172,7 @@ internal static class LayerGroupValidator
     /// <exception cref="InvalidDataException">Thrown when reference validation fails.</exception>
     private static void ValidateMemberReferences(
         LayerGroupDefinition layerGroup,
-        LayerGroupMemberDefinition member,
+        LayerGroupMember member,
         int index,
         IReadOnlyList<LayerDefinition> layers)
     {
@@ -224,7 +224,7 @@ internal static class LayerGroupValidator
     /// <exception cref="InvalidDataException">Thrown when property validation fails.</exception>
     private static void ValidateMemberProperties(
         LayerGroupDefinition layerGroup,
-        LayerGroupMemberDefinition member,
+        LayerGroupMember member,
         int index,
         HashSet<string> styleIds)
     {

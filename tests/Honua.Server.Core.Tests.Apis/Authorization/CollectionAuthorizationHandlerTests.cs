@@ -197,4 +197,72 @@ public class CollectionAuthorizationHandlerTests
         // Assert
         result.Succeeded.Should().Be(shouldSucceed);
     }
+
+    [Fact]
+    public async Task AuthorizeAsync_WithCachedResult_ReturnsCachedValue()
+    {
+        // Arrange
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "user-cache"),
+            new Claim(ClaimTypes.Role, "Reader")
+        }, "TestAuth"));
+
+        var cachedResult = ResourceAuthorizationResult.Success();
+        _mockCache.Setup(x => x.TryGet(It.IsAny<string>(), out cachedResult)).Returns(true);
+
+        // Act
+        var result = await _handler.AuthorizeAsync(user, "collection", "collection-cached", "Read");
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+        _mockCache.Verify(x => x.TryGet(It.IsAny<string>(), out cachedResult), Times.Once);
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_WithWrongResourceType_Fails()
+    {
+        // Arrange
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "user-123")
+        }, "TestAuth"));
+
+        // Act
+        var result = await _handler.AuthorizeAsync(user, "layer", "layer-1", "Read");
+
+        // Assert
+        result.Succeeded.Should().BeFalse();
+        result.FailureReason.Should().Contain("not supported");
+    }
+
+    [Fact]
+    public async Task AuthorizeAsync_WithDisabledAuthorization_AllowsAccess()
+    {
+        // Arrange
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "user-456")
+        }, "TestAuth"));
+
+        _mockOptions.Setup(x => x.CurrentValue).Returns(new ResourceAuthorizationOptions
+        {
+            Enabled = false,
+            DefaultAction = DefaultAction.Deny,
+            Policies = new List<ResourcePolicy>()
+        });
+
+        // Act
+        var result = await _handler.AuthorizeAsync(user, "collection", "collection-any", "Write");
+
+        // Assert
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ResourceType_ReturnsCollection()
+    {
+        // Assert
+        _handler.ResourceType.Should().Be("collection");
+    }
 }

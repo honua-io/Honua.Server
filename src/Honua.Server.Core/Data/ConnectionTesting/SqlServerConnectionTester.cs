@@ -3,12 +3,12 @@
 
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Honua.Server.Core.Metadata;
 using Honua.Server.Core.Security;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 
 namespace Honua.Server.Core.Data.ConnectionTesting;
@@ -53,8 +53,9 @@ public sealed class SqlServerConnectionTester : IConnectionTester
             }
 
             // Decrypt connection string if needed
-            var connectionString = _encryptionService?.DecryptConnectionString(dataSource.ConnectionString)
-                ?? dataSource.ConnectionString;
+            var connectionString = _encryptionService != null
+                ? await _encryptionService.DecryptAsync(dataSource.ConnectionString, cancellationToken).ConfigureAwait(false)
+                : dataSource.ConnectionString;
 
             await using var connection = new SqlConnection(connectionString);
 

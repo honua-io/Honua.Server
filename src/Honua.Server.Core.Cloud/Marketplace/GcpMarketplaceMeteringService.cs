@@ -257,7 +257,7 @@ public class GcpMarketplaceMeteringService : IMarketplaceMeteringService, IHoste
             var request = new HttpRequestMessage(HttpMethod.Post, $"{ServiceUsageApiUrl}/{serviceName}:report")
             {
                 Content = JsonContent.Create(reportRequest)
-            {
+            };
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
             var response = await _httpClient.SendAsync(request, cancellationToken);

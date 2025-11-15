@@ -246,4 +246,100 @@ public class CacheInvalidationOptionsValidatorTests
         // Assert
         result.Succeeded.Should().BeTrue();
     }
+
+    [Fact]
+    public void Validate_WithNullOptions_ReturnsFail()
+    {
+        // Act
+        var result = _validator.Validate(null, null!);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("cannot be null");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveRetryDelay_ReturnsFail()
+    {
+        // Arrange
+        var options = new CacheInvalidationOptions
+        {
+            RetryDelayMs = 10001 // Exceeds 10000
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("RetryDelayMs").And.Contain("exceeds");
+    }
+
+    [Fact]
+    public void Validate_WithZeroMaxRetryDelay_ReturnsFail()
+    {
+        // Arrange
+        var options = new CacheInvalidationOptions
+        {
+            MaxRetryDelayMs = 0
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("MaxRetryDelayMs").And.Contain("positive");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveMaxRetryDelay_ReturnsFail()
+    {
+        // Arrange
+        var options = new CacheInvalidationOptions
+        {
+            MaxRetryDelayMs = 60001 // Exceeds 60000
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("MaxRetryDelayMs").And.Contain("exceeds");
+    }
+
+    [Fact]
+    public void Validate_WithExcessiveOperationTimeout_ReturnsFail()
+    {
+        // Arrange
+        var options = new CacheInvalidationOptions
+        {
+            OperationTimeout = TimeSpan.FromMinutes(6) // Exceeds 5 minutes
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("OperationTimeout").And.Contain("exceeds");
+    }
+
+    [Fact]
+    public void Validate_WithInvalidStrategy_ReturnsFail()
+    {
+        // Arrange
+        var options = new CacheInvalidationOptions
+        {
+            Strategy = (CacheInvalidationStrategy)999 // Invalid enum value
+        };
+
+        // Act
+        var result = _validator.Validate(null, options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.FailureMessage.Should().Contain("Strategy").And.Contain("invalid");
+    }
 }
